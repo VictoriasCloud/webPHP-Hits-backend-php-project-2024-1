@@ -6,7 +6,7 @@
     include_once "doctorFunctions/logout.php";
     function route($method, $urlList, $requestData){
         global $Link;
-        echo "ураааа";
+        echo "1ураа";
         switch ($method) {
             case 'GET':
                 //getProfile($requestData);
@@ -15,14 +15,15 @@
             case 'POST':
                 switch ($urlList[2]) {
                     case 'register':  
-                        echo "ураааа";
+                        echo "2ураа";
                         registerDoctor($requestData);
                         break;
 
-                    /*case 'login':  
+                    case 'login':  
+                        echo "3ураа";
                         login($requestData);
                         break;
-
+/*
                     case 'logout':  
                         logout($requestData);
                         break;

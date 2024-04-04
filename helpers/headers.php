@@ -2,6 +2,7 @@
     //вспомогательные функции для формирования HTTP-статусов
 
     function setHTTPSStatus($status = "HTTP/1.0 200 OK", $message = null){
+        //если значения переданы, то они будут в этих переменных. если нет, то вот так
         switch($status){
             default:
             case "200":
@@ -26,6 +27,7 @@
                 $status = "HTTP/1.0 500 Internal Server Error";
                 break;
         }
+        //функция header() встроенная функция в PHP для отправки HTTP-заголовка в ответ на запрос от клиента. 
         header($status);
         if(!is_null($message)){
             echo json_encode(['message' => $message]);
