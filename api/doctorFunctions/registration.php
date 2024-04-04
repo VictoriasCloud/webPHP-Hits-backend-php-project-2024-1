@@ -1,125 +1,121 @@
 <?php
 
-// Обработка POST запроса на регистрацию врача
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    
-    // Проверка типа контента на JSON
-    if ($_SERVER['CONTENT_TYPE'] === 'application/json') {
-        
-        // Получение тела запроса
-        $request_body = file_get_contents('php://input');
-        
-        // Декодирование JSON данных
-        $data = json_decode($request_body, true);
-        
-        // Проверка наличия обязательных полей
-        if (isset($data['name'], $data['password'], $data['email'], $data['gender'], $data['speciality'])) {
-            
-            // Проверка валидности полей
-            if (validateFields($data)) {
-                
-                // Выполнение регистрации врача
-                $registration_result = registerDoctor($data);
-                
-                // Отправка соответствующего ответа
-                if ($registration_result['success']) {
-                    http_response_code(200);
-                    header('Content-Type: text/plain');
-                    echo json_encode(array('token' => $registration_result['token']));
-                    exit();
-                } else {
-                    http_response_code(500);
-                    header('Content-Type: application/json');
-                    echo json_encode(array('status' => 'error', 'message' => $registration_result['message']));
-                    exit();
-                }
-                
-            } else {
-                // Ошибка - невалидные данные
-                http_response_code(400);
-                exit();
-            }
-            
-        } else {
-            // Ошибка - недостаточно аргументов
-            http_response_code(400);
-            exit();
+// Функция регистрации доктора
+function registerDoctor($requestData) {
+    global $Link;
+
+    // Извлечение данных из запроса("sha1": Это алгоритм хэширования, который
+    // используется для преобразования входной строки в хэш для обеспечения безопасности пароля.)
+    $password = hash("sha1", $requestData->body->password);
+    $name = $requestData->body->name;
+    $email = $requestData->body->email;
+    $birthday = $requestData->body->birthday;
+    $gender = $requestData->body->gender;
+    $phone = $requestData->body->phone;
+    $speciality = $requestData->body->speciality;
+
+    // Проверка валидности данных
+    $validationErrors = validateDoctorData($password, $name, $email, $gender, $phone);
+
+    // Если есть ошибки валидации, возвращаем соответствующий статус и сообщение
+    if (!empty($validationErrors)) {
+        $validationMessage = "";
+        foreach ($validationErrors as $err) {
+            $validationMessage .= "$err[0]: $err[1] \n";
         }
-        
+        setHTTPSStatus("400", $validationMessage);
+        return;
+    }
+
+    // Генерация ID и токена
+    //не надо,поставила автоинкрементом $id = generate_uuid();
+    $token = generateToken();
+
+    // Вставка данных в базу данных
+    $userInsertResult = $Link->query("INSERT INTO doctor(name, password, email, birthday, gender, phone, speciality) VALUES('$name', '$password', '$email', '$birthday',  '$gender', '$phone', '$speciality')");
+    if (!$userInsertResult) {
+        if ($Link->errno == 1062) {
+            setHTTPSStatus("409", "Адрес электронной почты '$email' уже занят");
+            return;
+        }
     } else {
-        // Ошибка - неверный тип контента
-        http_response_code(400);
-        exit();
+        // Вставка токена в базу данных
+        echo "ураааа";
+        $timeToValid = date('Y-m-d\TH:i:s.u');
+        $doctorInfo=$Link->query("SELECT email, id FROM doctor WHERE email='$email'")->fetch_assoc();
+        $doctorId=$doctorInfo['id'];
+        $tokenInsertResult = $Link->query("INSERT INTO token(value, doctorId, createTime) VALUES('$token', '$doctorId', '$timeToValid')");
+
+        if (!$tokenInsertResult) {
+            // В случае ошибки вставки токена, возвращаем статус 500 и сообщение об ошибке
+            setHTTPSStatus("500", $Link->error);
+        } else {
+            // Возвращаем успешный ответ с токеном
+            echo "ураааа";
+            echo json_encode(['token' => $token]);
+        }
     }
-    
-} else {
-    // Ошибка - неверный метод запроса
-    http_response_code(405);
-    exit();
 }
 
-// Функция регистрации врача
-function registerDoctor($data) {
-    // Здесь должна быть ваша логика регистрации врача
-    // Например, вам нужно сохранить данные в базу данных, выполнить проверки и т.д.
-    
-    // Предположим, что регистрация успешно выполнена и токен сгенерирован
-    $token = generateToken(); // Генерация токена, ваша собственная логика
-    
-    // Возвращаем результат регистрации
-    return array('success' => true, 'token' => $token);
+// Функция валидации данных доктора
+function validateDoctorData($password, $name, $email, $gender, $phone) {
+    $validationErrors = [];
+
+    if (!validateStringNotLess($password, 6)) {
+        $validationErrors[] = ["password", "Пароль менее 6 символов"];
+    }
+
+    if (!correctEmail($email)) {
+        $validationErrors[] = ["email", "Некорректный адрес электронной почты"];
+    }
+
+    if (!correctPhoneNumber($phone)) {
+        $validationErrors[] = ["phone", "Некорректный номер телефона"];
+    }
+
+    if (!validateStringNotLess($name, 1)) {
+        $validationErrors[] = ["name", "Имя менее 1 символа"];
+    }
+
+    if (!validateGender($gender)) {
+        $validationErrors[] = ["gender", "Некорректное значение пола"];
+    }
+
+    return $validationErrors;
 }
 
-// Функция генерации токена
+// Функция валидации строки на минимальную длину
+function validateStringNotLess($string, $minLength) {
+    return strlen($string) >= $minLength;
+}
+
+// Функция проверки правильности формата электронной почты
+function correctEmail($email) {
+    return filter_var($email, FILTER_VALIDATE_EMAIL);
+}
+
+// Функция проверки правильности формата номера телефона
+function correctPhoneNumber($phone) {
+    // Ваша реализация проверки формата номера телефона
+    return true; // Заглушка, замените на свою реализацию
+}
+
+// Функция валидации пола (допустимые значения "Male" и "Female")
+function validateGender($gender) {
+    return in_array($gender, array('Male', 'Female'));
+}
+
+// Генерация токена
 function generateToken() {
-    // Здесь должна быть ваша логика генерации токена
-    return 'generated_token'; // Возвращаем фиксированный токен в качестве примера
+    return bin2hex(random_bytes(16));
 }
 
-// Функция валидации полей
-function validateFields($data) {
-    // Проверка валидности полей данных
-    
-    // Проверка на соответствие длины имени
-    if (isset($data['name']) && (strlen($data['name']) < 1 || strlen($data['name']) > 1000)) {
-        return false;
-    }
-    
-    // Проверка на соответствие длины пароля
-    if (isset($data['password']) && strlen($data['password']) < 6) {
-        return false;
-    }
-    
-    // Проверка валидности email
-    if (isset($data['email']) && !filter_var($data['email'], FILTER_VALIDATE_EMAIL)) {
-        return false;
-    }
-    
-    // Проверка валидности даты рождения (если предоставлена)
-    if (isset($data['birthday']) && !validateDateTime($data['birthday'])) {
-        return false;
-    }
-    
-    // Проверка валидности номера телефона (если предоставлен)
-    if (isset($data['phone']) && !validatePhoneNumber($data['phone'])) {
-        return false;
-    }
-    
-    return true;
-}
+function generate_uuid() {
+    // Генерация случайных байтов
+    $data = random_bytes(16);
 
-// Функция проверки валидности формата даты и времени
-function validateDateTime($dateTime) {
-    $format = 'Y-m-d\TH:i:s.u\Z';
-    $d = DateTime::createFromFormat($format, $dateTime);
-    return $d && $d->format($format) === $dateTime;
+    // Установка версии 4
+    $data[6] = chr(ord($data[6]) & 0x0f | 0x40);
+    $data[8] = chr(ord($data[8]) & 0x3f | 0x80);
+    // Преобразование байтов в строк
 }
-
-// Функция проверки валидности номера телефона
-function validatePhoneNumber($phoneNumber) {
-    // Здесь может быть ваша логика проверки номера телефона
-    // Возвращаем true для примера
-    return true;
-}
-
-?>
