@@ -4,7 +4,6 @@
         
         //echo "123";
         $body = $requestData->body;
-        $name=$body->name;
         $speciality = $body->speciality;
         $timeToValid = date('Y-m-d\TH:i:s.u');
         //встроенная функция, которая фиксирует время сейчас
@@ -25,4 +24,3 @@
             //echo statusCode("Internal Server Error", 500);
         }
     }
-?>

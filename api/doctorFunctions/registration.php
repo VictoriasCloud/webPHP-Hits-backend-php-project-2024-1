@@ -119,4 +119,3 @@ function generate_uuid() {
     $data[8] = chr(ord($data[8]) & 0x3f | 0x80);
     // Преобразование байтов в строк
 }
-?>

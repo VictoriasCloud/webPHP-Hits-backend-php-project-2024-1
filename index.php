@@ -58,6 +58,3 @@
     
     mysqli_close($Link);
     return;
-
-    
-?>
