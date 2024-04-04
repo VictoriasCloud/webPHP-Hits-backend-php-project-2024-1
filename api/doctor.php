@@ -18,16 +18,15 @@
                         echo "2ураа";
                         registerDoctor($requestData);
                         break;
-
                     case 'login':  
                         echo "3ураа";
                         login($requestData);
                         break;
-/*
                     case 'logout':  
-                        logout($requestData);
+                        echo "4ураа";
+                        logout(explode(' ', getallheaders()['Authorization'])[1]);
                         break;
-
+/*
                     default:
                         setHTTPSStatus("404", "There is no such path as 'account/$urlList[1]'");
                         break;  */                  
