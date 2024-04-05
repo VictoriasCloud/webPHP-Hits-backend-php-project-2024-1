@@ -9,8 +9,9 @@
         echo "1ураа";
         switch ($method) {
             case 'GET':
-                //getProfile($requestData);
-                //break;
+                echo "5ураа";
+                getProfile(explode(' ', getallheaders()['Authorization'])[1]);
+                break;
 
             case 'POST':
                 switch ($urlList[2]) {
