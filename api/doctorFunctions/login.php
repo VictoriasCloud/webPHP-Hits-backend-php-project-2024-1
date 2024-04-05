@@ -14,7 +14,7 @@ function login($requestData) {
     // Проверяем, существует ли токен для этого пользователя
     $tokenCheckQuery = "SELECT * FROM token WHERE doctorId IN (SELECT id FROM doctor WHERE email='$email')";
     $tokenCheckResult = $Link->query($tokenCheckQuery);
-
+    //num_rows-это метод объекта mysqli_result, который возвращает количество строк т.е 1 польз-ель с указанным email и паролем
     if ($result->num_rows == 1) {
         // Если пользователь существует
 

@@ -3,7 +3,6 @@ include_once "helpers/headers.php";
 
 function getProfile($token) {
     global $Link;
-    echo $token;
 
     // Проверяем, передан ли токен
     if (!isset($token)) {
