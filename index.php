@@ -1,5 +1,8 @@
 <?php
     include_once 'helpers/headers.php';
+    include_once 'helpers/checks.php';
+    include_once 'helpers/validations.php';
+
 
     global $Link, $UploadDir;
 

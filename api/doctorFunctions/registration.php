@@ -61,7 +61,7 @@ function registerDoctor($requestData) {
 function validateDoctorData($password, $name, $email, $gender, $phone) {
     $validationErrors = [];
 
-    if (!validateStringNotLess($password, 6)) {
+    if (!validateStringNotLess($password)) {
         $validationErrors[] = ["password", "Пароль менее 6 символов"];
     }
 
@@ -73,7 +73,7 @@ function validateDoctorData($password, $name, $email, $gender, $phone) {
         $validationErrors[] = ["phone", "Некорректный номер телефона"];
     }
 
-    if (!validateStringNotLess($name, 1)) {
+    if (!validateName($name)) {
         $validationErrors[] = ["name", "Имя менее 1 символа"];
     }
 
@@ -84,38 +84,3 @@ function validateDoctorData($password, $name, $email, $gender, $phone) {
     return $validationErrors;
 }
 
-// Функция валидации строки на минимальную длину
-function validateStringNotLess($string, $minLength) {
-    return strlen($string) >= $minLength;
-}
-
-// Функция проверки правильности формата электронной почты
-function correctEmail($email) {
-    return filter_var($email, FILTER_VALIDATE_EMAIL);
-}
-
-// Функция проверки правильности формата номера телефона
-function correctPhoneNumber($phone) {
-    // Ваша реализация проверки формата номера телефона
-    return true; // Заглушка, замените на свою реализацию
-}
-
-// Функция валидации пола (допустимые значения "Male" и "Female")
-function validateGender($gender) {
-    return in_array($gender, array('Male', 'Female'));
-}
-
-// Генерация токена
-function generateToken() {
-    return bin2hex(random_bytes(16));
-}
-
-function generate_uuid() {
-    // Генерация случайных байтов
-    $data = random_bytes(16);
-
-    // Установка версии 4
-    $data[6] = chr(ord($data[6]) & 0x0f | 0x40);
-    $data[8] = chr(ord($data[8]) & 0x3f | 0x80);
-    // Преобразование байтов в строк
-}
