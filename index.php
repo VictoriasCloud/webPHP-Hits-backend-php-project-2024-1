@@ -52,7 +52,7 @@
     }
 
     else{
-        setHTTPSStatus("404", "There is no such path (index.php)");
+        setHTTPSStatus("404", "There is no such path (index.php)/Not Found");
     }
 
     
