@@ -6,38 +6,39 @@
     include_once "doctorFunctions/logout.php";
     function route($method, $urlList, $requestData){
         global $Link;
-        echo "ураааа";
         switch ($method) {
             case 'GET':
-                //getProfile($requestData);
-                //break;
+                echo "5ураа";
+                getProfile(explode(' ', getallheaders()['Authorization'])[1]);
+                break;
 
             case 'POST':
                 switch ($urlList[2]) {
                     case 'register':  
-                        echo "ураааа";
+                        echo "2ураа";
                         registerDoctor($requestData);
                         break;
-
-                    /*case 'login':  
+                    case 'login':  
+                        echo "3ураа";
                         login($requestData);
                         break;
-
                     case 'logout':  
-                        logout($requestData);
+                        echo "4ураа";
+                        logout(explode(' ', getallheaders()['Authorization'])[1]);
                         break;
-
                     default:
+                    //или 400 ошибка(неверный запрос к урлу)
                         setHTTPSStatus("404", "There is no such path as 'account/$urlList[1]'");
-                        break;  */                  
+                        break;             
                 }                  
                 break;
 
             case 'PUT':
-                //editProfile($requestData);
+                editProfile($requestData);
                 break;
             
             default:
+                //или 400 ошибка(неверный запрос к урлу/синтаксическая ошибка)
                 setHTTPSStatus("404", "There is no such method here");
                 break;
         }
