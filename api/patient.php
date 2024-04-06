@@ -1,5 +1,7 @@
 <?php
-    include_once "patientFunctions/patient.php";
+    include_once "patientFunctions/createNewPatient.php";
+    include_once "patientFunctions/getPatientCard.php";
+
     function route($method, $urlList, $requestData){
         global $Link;
         switch ($method) {
@@ -10,7 +12,7 @@
                         getPatientsList(explode(' ', getallheaders()['Authorization'])[1]);
                         break;
                     case 'getPatientCard':
-                        getPatientCard($requestData);
+                        getPatientCard($urlList);
                         break;
                     case 'getAlistOfPatientMedicalInspections':
                         getAlistOfPatientMedicalInspections($requestData);
@@ -23,6 +25,7 @@
                         # code...
                         break;
                 }
+                break;
 
             case 'POST':
                 switch ($urlList[2]) {

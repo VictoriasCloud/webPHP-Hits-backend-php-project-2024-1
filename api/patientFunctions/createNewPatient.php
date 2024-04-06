@@ -32,7 +32,7 @@ function createNewPatient($requestData) {
         if ($insertPatientResult) {
             // Если пациент успешно создан, возвращаем статус 200 (OK) с идентификатором созданного пациента
             $patientId = $Link->insert_id;
-            setHTTPSStatus("200", "Patient was created");
+            setHTTPSStatus("200", "Patient was created id='$patientId'");
         } else {
             // Если произошла ошибка при создании пациента, возвращаем статус 500 (Internal Server Error) с сообщением об ошибке
             setHTTPSStatus("500", $Link->error);
