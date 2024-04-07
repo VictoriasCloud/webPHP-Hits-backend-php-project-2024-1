@@ -16,7 +16,11 @@ function searchICD10Diagnoses() {
         
             // Выполнение запроса
             $result = $Link->query($searchQuery);
-        
+
+            if (!$result) {
+                setHTTPSStatus("500", "InternalServerError");
+                return;
+            }
             // Подготовка данных для ответа (records-каждый элемент массива-одна запись)
             $records = [];
             while ($row = $result->fetch_assoc()) {
@@ -30,6 +34,7 @@ function searchICD10Diagnoses() {
                 setHTTPSStatus("400", "Invalid value for attribute page/Bad Request");
                 return;
             }
+            
             $pagination = [
                 "sizeForElements" => count($records),
                 "countOfPages" => $countOfPages, // Вернуть общее количество записей
@@ -38,6 +43,7 @@ function searchICD10Diagnoses() {
         
             // Формирование ответа в формате JSON
             echo json_encode(['records' => $records, 'pagination' => $pagination]);
+            setHTTPSStatus("200", "Searching result extracted");
         }
         else{
             setHTTPSStatus("400", "Some fields in request are invalid");
