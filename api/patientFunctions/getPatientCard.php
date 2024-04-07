@@ -15,7 +15,6 @@ function getPatientCard() {
 
         // Возвращаем данные пациента в виде JSON
         echo json_encode($patientData);
-         $_GET['id'];
         setHTTPSStatus("200", "Success");
 
     } else {
