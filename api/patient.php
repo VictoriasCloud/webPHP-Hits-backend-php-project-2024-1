@@ -1,24 +1,24 @@
 <?php
     include_once "patientFunctions/createNewPatient.php";
     include_once "patientFunctions/getPatientCard.php";
+    include_once "patientFunctions/getPatientList.php";
 
     function route($method, $urlList, $requestData){
-        global $Link;
         switch ($method) {
             case 'GET':
                 switch ($urlList[2]) {
                     case 'getPatientsList':
                         echo "5ураа";
-                        getPatientsList(explode(' ', getallheaders()['Authorization'])[1]);
+                        getPatientList();
                         break;
                     case 'getPatientCard':
-                        getPatientCard($urlList);
+                        getPatientCard();
                         break;
                     case 'getAlistOfPatientMedicalInspections':
-                        getAlistOfPatientMedicalInspections($requestData);
+                        getAlistOfPatientMedicalInspections();
                         break;
                     case 'SearchForPatientWithoutChildInspections':
-                        SearchForPatientWithoutChildInspections($requestData);
+                        SearchForPatientWithoutChildInspections();
                         break;
                     
                     default:

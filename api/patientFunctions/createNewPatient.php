@@ -58,5 +58,3 @@ function validatePatientData($name, $birthday, $gender){
     }
     return true;
 }
-
-?>

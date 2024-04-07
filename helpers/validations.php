@@ -23,7 +23,7 @@ function validateName($name) {
     return true;
 }
 
-function validateGender(){
+function validateGender($str){
     if($str == "Male" || $str == "Female"){
         return true;
     }
@@ -31,7 +31,7 @@ function validateGender(){
 }
 
 // Функция валидации пароля на мин длину(6)
-function validateStringNotLess($string, $minLength) {
+function validateStringNotLess($string) {
     return strlen($string) >= 6;
 }
 
