@@ -2,13 +2,16 @@
     include_once "patientFunctions/createNewPatient.php";
     include_once "patientFunctions/getPatientCard.php";
     include_once "patientFunctions/getPatientList.php";
+    include_once "patientFunctions/getAlistOfPatientMedicalInspections.php";
+    include_once "patientFunctions/CreateInspectionForSpecifiedPatient.php";
+    include_once "patientFunctions/SearchForPatientWithoutChildInspections.php";
 
     function route($method, $urlList, $requestData){
+        global $Link;
         switch ($method) {
             case 'GET':
                 switch ($urlList[2]) {
-                    case 'getPatientsList':
-                        echo "5ураа";
+                    case 'getPatientList':
                         getPatientList();
                         break;
                     case 'getPatientCard':
@@ -33,7 +36,7 @@
                         createNewPatient($requestData);
                         break;
                     case 'CreateInspectionForSpecifiedPatient':  
-                        CreateInspectionForSpecifiedPatient($requestData);
+                        CreateInspectionForSpecifiedPatient($Link, $requestData);
                         break;
                     default:
                     //или 400 ошибка(неверный запрос к урлу)

@@ -59,12 +59,3 @@ function getSpecialitiesList() {
     return;
 }
 
-
-function validatePaginationParameters($page, $size) {
-    // Проверка наличия параметров page и size
-    if (empty($page) || empty($size)) {
-        setHTTPSStatus("400", "Invalid arguments for pagination");
-        return false;
-    }
-    return true;
-}

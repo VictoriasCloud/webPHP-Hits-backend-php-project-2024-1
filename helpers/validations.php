@@ -1,5 +1,17 @@
 
 <?php
+
+function validateConclusion($conclusion) {
+    // Перечень допустимых значений
+    $allowedValues = ['Disease', 'Recovery', 'Death'];
+    
+    // Проверяем, присутствует ли значение в списке допустимых значений
+    if (in_array($conclusion, $allowedValues)) {
+        return true;
+    }
+    // Значение не входит в список допустимых
+    return false;
+}
 // Функция для валидации дня рождения
 function validateBirthday($birthday) {
     // Проверяем корректность формата даты и времени
@@ -14,6 +26,7 @@ function validateBirthday($birthday) {
     }
     return true;
 }
+
 
 function validateName($name) {
     // Проверка, что строка больше 1 символа,является строкой, содержит только буквы
@@ -59,11 +72,11 @@ function generateToken() {
     return bin2hex(random_bytes(16));
 }
 //ну вдруг понадобится(у меня в бд id-автоинкремент)
-function generate_uuid() {
-    // Генерация случайных байтов
-    $data = random_bytes(16);
-
-    $data[6] = chr(ord($data[6]) & 0x0f | 0x40);
-    $data[8] = chr(ord($data[8]) & 0x3f | 0x80);
-    
+function validatePaginationParameters($page, $size) {
+    // Проверка наличия параметров page и size
+    if (empty($page) || empty($size)) {
+        setHTTPSStatus("400", "Invalid arguments for pagination");
+        return false;
+    }
+    return true;
 }
