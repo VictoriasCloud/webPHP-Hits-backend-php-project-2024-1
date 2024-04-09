@@ -1,5 +1,17 @@
 
 <?php
+
+function validateConclusion($conclusion) {
+    // Перечень допустимых значений
+    $allowedValues = ['Disease', 'Recovery', 'Death'];
+    
+    // Проверяем, присутствует ли значение в списке допустимых значений
+    if (in_array($conclusion, $allowedValues)) {
+        return true;
+    }
+    // Значение не входит в список допустимых
+    return false;
+}
 // Функция для валидации дня рождения
 function validateBirthday($birthday) {
     // Проверяем корректность формата даты и времени
@@ -14,6 +26,7 @@ function validateBirthday($birthday) {
     }
     return true;
 }
+
 
 function validateName($name) {
     // Проверка, что строка больше 1 символа,является строкой, содержит только буквы

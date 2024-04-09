@@ -11,8 +11,7 @@
         switch ($method) {
             case 'GET':
                 switch ($urlList[2]) {
-                    case 'getPatientsList':
-                        echo "5ураа";
+                    case 'getPatientList':
                         getPatientList();
                         break;
                     case 'getPatientCard':
