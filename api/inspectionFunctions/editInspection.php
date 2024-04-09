@@ -1,6 +1,5 @@
 <?php
 
-
 function editInspection($requestData) {
     global $Link;
     $id = $_GET['id']; 
@@ -55,5 +54,27 @@ function editInspection($requestData) {
     } else {
         // Если произошла ошибка при обновлении, возвращаем статус 500 (InternalServerError)
         setHTTPSStatus("500", "InternalServerError");
+        return;
     }
+
+    // Обновление информации о диагнозах
+    if (isset($requestData->body->diagnoses)) {
+        foreach ($requestData->body->diagnoses as $diagnosis) {
+            $icdDiagnosisId = $diagnosis->icdDiagnosisId;
+            $description = $diagnosis->description;
+            $type = $diagnosis->type;
+
+            // Обновляем информацию о диагнозе
+            $updateDiagnosisQuery = "UPDATE diagnosis SET description='$description', type='$type' WHERE id='$icdDiagnosisId'";
+
+            if ($Link->query($updateDiagnosisQuery) !== TRUE) {
+                // Если произошла ошибка при обновлении диагноза, возвращаем статус 500 (InternalServerError)
+                setHTTPSStatus("500", "InternalServerError");
+                return;
+            }
+        }
+    }
+
+    // Возвращаем значение $requestData->body->anamnesis
+    return $anamnesis;
 }
