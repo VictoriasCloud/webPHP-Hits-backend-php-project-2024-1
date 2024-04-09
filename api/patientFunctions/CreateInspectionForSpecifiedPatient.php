@@ -185,11 +185,11 @@ function insertDiagnosis($requestData, $inspectionId, $createTime){
                 setHTTPSStatus("500", "InternalServerError");
                 return false;
             }
-            else{
-                return true;
-            }
         }
+        setHTTPSStatus("200", "Diagnosis was inserted successfully.");
+
     }
+    return true;
 }
 
 function insertConsultation($requestData, $inspectionId, $createTime, $idDoctor, $idPatient){
@@ -253,7 +253,6 @@ function insertCommentFromParentId($Link, $consultation, $idConsultation, $docto
         return 0;
     }
     $createTime= date('Y-m-d\TH:i:s.u');
-    echo $idConsultation;
     $commentInsertResult = $Link->query("INSERT INTO comments(createTime, content, authorId, nameAuthor, idConsultation) VALUES('$createTime','$commentContent', '$commentAuthorId', '$commentAuthorName', '$idConsultation')"); 
     if ($commentInsertResult){
         setHTTPSStatus("200", "Comment was inserted successfully.");

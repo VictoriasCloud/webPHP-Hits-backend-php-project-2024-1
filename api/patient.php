@@ -2,6 +2,7 @@
     include_once "patientFunctions/createNewPatient.php";
     include_once "patientFunctions/getPatientCard.php";
     include_once "patientFunctions/getPatientList.php";
+    include_once "patientFunctions/getAlistOfPatientMedicalInspections.php";
     include_once "patientFunctions/CreateInspectionForSpecifiedPatient.php";
 
     function route($method, $urlList, $requestData){
