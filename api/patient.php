@@ -4,6 +4,7 @@
     include_once "patientFunctions/getPatientList.php";
     include_once "patientFunctions/getAlistOfPatientMedicalInspections.php";
     include_once "patientFunctions/CreateInspectionForSpecifiedPatient.php";
+    include_once "patientFunctions/SearchForPatientWithoutChildInspections.php";
 
     function route($method, $urlList, $requestData){
         global $Link;
