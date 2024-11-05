@@ -5,12 +5,13 @@
     
 
     function route($method, $urlList, $requestData){
-        global $Link;
+        ;
         switch ($method) {
             case 'GET':
                 switch ($urlList[2]) {
                     case 'getInspectionChain':  
-                        getInspectionChain();
+                        $inspectionId = $_GET['inspectionId']; 
+                        getInspectionChain($inspectionId);
                         break;
                     case '':  
                         getFullInfo();

@@ -1,8 +1,8 @@
 <?php
-function getInspectionChain(){
+function getInspectionChain($inspectionId){
 
     global $Link;
-    $inspectionId = $_GET['inspectionId']; 
+
 
     // Проверка авторизации пользователя
     $checkTokenResult = checkToken($Link);
