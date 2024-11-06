@@ -18,11 +18,20 @@ function route($method, $urlList, $requestData) {
     switch ($method) {
         case 'GET':
             if ($patientId !== null && isset($urlList[3]) && $urlList[3] === 'inspections') {
-                getAlistOfPatientMedicalInspections($patientId, $requestData->parameters);
-                //var_dump($requestData->parameters); 
-            } 
+                if (isset($urlList[4]) && $urlList[4] === 'search') {
+                    // /api/patient/{id}/inspections/search — поиск мед осмотров без дочерних осмотров
+                    SearchForPatientWithoutChildInspections($patientId, $requestData->parameters);
+                } else {
+                    // /api/patient/{id}/inspections — получение листа мед осмотров
+                    getAlistOfPatientMedicalInspections($patientId, $requestData->parameters);
+                }
+            }
+            elseif ($patientId !== null && count($urlList) == 3 && $urlList[1] === 'patient') {
+                // /api/patient/{id} — карта пациента
+                getPatientCard($patientId);
+            }
             elseif ($patientId === null && count($urlList) == 2 && $urlList[1] === 'patient') {
-                // Путь соответствует /api/patient, выполняем получение списка пациентов
+                // /api/patient — получение списка пациентов
                 getPatientList();
             }
             else {

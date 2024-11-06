@@ -60,7 +60,7 @@ function getPatientList() {
             }
         }
 
-        // Фильтрация по "Мои пациенты"
+        // Фильтрация по "Мои пациенты". пациенты, у которых есть хотя бы один осмотр, проведенный данным врачом
         if ($onlyMine == 'true') {
             $conditions[] = "id IN (SELECT DISTINCT idPatient FROM inspection WHERE idDoctor = '$doctorId')";
         }
