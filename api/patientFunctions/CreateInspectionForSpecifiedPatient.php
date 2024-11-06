@@ -158,18 +158,31 @@ function insertConsultation($requestData, $inspectionId, $createTime, $idDoctor,
     global $Link;
     $consultations = $requestData->consultations ?? [];
     if (isset($consultations) && is_array($consultations)) {
+        $uniqueSpecialities = array_unique(array_column($consultations, 'specialityId'));
+        
+        // Проверка на уникальность специальностей, ведь нельзя несколько консультаций на 1 специальность
+        if (count($uniqueSpecialities) !== count($consultations)) {
+            setHTTPSStatus("400", "An examination cannot have multiple consultations with the same doctor's specialty.");
+            return false;
+        }
+        
         foreach ($consultations as $consultation) {
             $specialityId = $consultation->specialityId;
-            $uniqueSpecialities = array_unique(array_column($consultations, 'specialityId'));
-            if (count($uniqueSpecialities) !== count($consultations)) {
-                setHTTPSStatus("400", "An examination cannot have multiple consultations with the same doctor's specialty.");
+            
+            // Проверка наличия и заполненности content
+            if (empty($consultation->comment->content)) {
+                setHTTPSStatus("400", "Consultation comment content is required and cannot be empty.");
                 return false;
             }
-            $consultationInsertResult = $Link->query("INSERT INTO consultation(inspectionId, specialityId, createTime, idDoctor, idPatient) VALUES('$inspectionId', '$specialityId', '$createTime', '$idDoctor', '$idPatient')");
+            
+            // Вставка консультации в таблицу
+            $consultationInsertResult = $Link->query("INSERT INTO consultation (inspectionId, specialityId, createTime, idDoctor, idPatient) VALUES ('$inspectionId', '$specialityId', '$createTime', '$idDoctor', '$idPatient')");
             if (!$consultationInsertResult) {
                 setHTTPSStatus("500", "Error inserting consultation: " . $Link->error);
                 return false;
             }
+
+            // Вставка комментария для консультации
             $idConsultation = $Link->insert_id;
             if (!insertComment($Link, $consultation, $idConsultation, $idDoctor)) {
                 setHTTPSStatus("500", "Error inserting comment for consultation.");
@@ -181,21 +194,23 @@ function insertConsultation($requestData, $inspectionId, $createTime, $idDoctor,
     setHTTPSStatus("500", "No consultations provided.");
     return false;
 }
+
 function insertComment($Link, $consultation, $idConsultation, $doctorId) {
     $commentContent = $consultation->comment->content ?? null;
-    if (is_null($commentContent)) {
+    
+    //наличие контента
+    if (is_null($commentContent) || trim($commentContent) === '') {
         setHTTPSStatus("400", "The comment field is empty.");
         return false;
     }
-    
-    $createTime = date('Y-m-d\TH:i:s.u'); 
+
+    $createTime = date('Y-m-d\TH:i:s.u');
     $commentInsertResult = $Link->query("INSERT INTO comments (createTime, content, authorId, idConsultation) VALUES ('$createTime', '$commentContent', '$doctorId', '$idConsultation')");
     
     if (!$commentInsertResult) {
         setHTTPSStatus("500", "Error inserting comment: " . $Link->error);
         return false;
     }
-    
+
     return true;
 }
-
