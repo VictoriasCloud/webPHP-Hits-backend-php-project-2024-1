@@ -10,7 +10,6 @@ function route($method, $urlList, $requestData) {
     global $Link;
     // Проверка токена, чтобы не проверять его в каждой функци.
     if (!checkToken($Link)) {
-        // Если токен недействителен, завершить выполнение
         return;
     }
     $patientId = isset($urlList[2]) && is_numeric($urlList[2]) ? $urlList[2] : null;
@@ -21,7 +20,12 @@ function route($method, $urlList, $requestData) {
             if ($patientId !== null && isset($urlList[3]) && $urlList[3] === 'inspections') {
                 getAlistOfPatientMedicalInspections($patientId, $requestData->parameters);
                 //var_dump($requestData->parameters); 
-            } else {
+            } 
+            elseif ($patientId === null && count($urlList) == 2 && $urlList[1] === 'patient') {
+                // Путь соответствует /api/patient, выполняем получение списка пациентов
+                getPatientList();
+            }
+            else {
                 setHTTPSStatus("404", "Invalid GET route for patient");
             }
             break;
