@@ -3,14 +3,20 @@ function getAlistOfPatientMedicalInspections($patientId, $params) {
     global $Link;
     
     $checkTokenResult = checkToken($Link);
+
+    $checkTokenResult = checkToken($Link);  // Проверяем токен
+    if (!$checkTokenResult) {  // Если токен недействителен
+        setHTTPSStatus("401", "Unauthorized");
+        return;
+    }
     $grouped = $params['grouped'] ?? 'false';
-    $page = (int)($params['page'] ?? 1);  // Приводим к числу для консистентности
-    $size = (int)($params['size'] ?? 5);  // Приводим к числу для консистентности
+    $page = (int)($params['page'] ?? 1);  
+    $size = (int)($params['size'] ?? 5); 
 
     // Собираем все значения icdRoots
     $icdRoots = $params['icdRoots'] ?? [];
 
-    // Изменяем запрос, чтобы сначала выбрать все записи с фильтрацией, а затем выполнять пагинацию в PHP
+    // сначала выбрать все записи с фильтрацией, а затем выполнять пагинацию
     $query = "SELECT * FROM inspection WHERE idPatient='$patientId'";
     if ($grouped === 'true') {
         $query .= " AND previousInspectionId=''";
@@ -69,12 +75,13 @@ function getAlistOfPatientMedicalInspections($patientId, $params) {
 
     // Рассчитываем общее количество страниц
     $totalRecords = count($allInspections);
-    $totalPages = (int)ceil($totalRecords / $size); // Приводим к числу для единообразия
+    $totalPages = (int)ceil($totalRecords / $size); // Приводим к числу чтоб красиво всё было
 
     // Выполняем пагинацию с помощью array_slice
+    //array_slice возвращает часть массива, начиная с указанного индекса и до заданной длины.
+    //например, 10 записей и мы хотим вывести по 5 на страницу, array_slice для page=2 вернет записи с 6-й по 10-ю.
     $paginatedInspections = array_slice($allInspections, ($page - 1) * $size, $size);
 
-    // Ответ с учетом новой пагинации и пересчитанного количества страниц
     echo json_encode([
         'inspections' => $paginatedInspections,
         'pagination' => [
