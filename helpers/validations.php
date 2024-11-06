@@ -80,3 +80,29 @@ function validatePaginationParameters($page, $size) {
     }
     return true;
 }
+
+function validateConclusionLogic($conclusion, $nextVisitDate, $deathDate, $patientId) {
+    switch ($conclusion) {
+        case "Disease":
+            if (is_null($nextVisitDate)) {
+                setHTTPSStatus("400", "Specify the date of the next visit.");
+                return false;
+            }
+            break;
+        case "Death":
+            if (!checkConclusionWithDeath($patientId)) {
+                return false;
+            }
+            if (is_null($deathDate)) {
+                setHTTPSStatus("400", "Specify the date of death.");
+                return false;
+            }
+            break;
+        case "Recovery":
+            break;
+        default:
+            setHTTPSStatus("400", "Invalid conclusion type");
+            return false;
+    }
+    return true;
+}

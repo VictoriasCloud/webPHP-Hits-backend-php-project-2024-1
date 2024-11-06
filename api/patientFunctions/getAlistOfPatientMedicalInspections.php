@@ -1,129 +1,141 @@
 <?php
-
-function getAlistOfPatientMedicalInspections(){
+function getAlistOfPatientMedicalInspections($patientId, $params) { 
     global $Link;
     
-    $checkTokenResult = checkToken($Link);
-    $patientId = $_GET['patientId'];
-    $grouped = $_GET['grouped'];
-    $icdRoots = $_GET['icdRoots'];
-    $page = $_GET['page'];
-    $size = $_GET['size'];
-    validateArguments($grouped, $icdRoots, $page, $size);
+
+    $checkTokenResult = checkToken($Link);  
+    if (!$checkTokenResult) { 
+        setHTTPSStatus("401", "Unauthorized");
+        return;
+    }
+    $grouped = $params['grouped'] ?? 'false';
+    $page = (int)($params['page'] ?? 1);  
+    $size = (int)($params['size'] ?? 5); 
+
+    // Собираем все значения icdRoots
+    $icdRoots = $params['icdRoots'] ?? [];
+
+    // сначала выбрать все записи с фильтрацией, а затем выполнять пагинацию
+    $query = "SELECT * FROM inspection WHERE idPatient='$patientId'";
+    if ($grouped === 'true') {
+        $query .= " AND previousInspectionId=''";
+    }
     
-    // Проверяем, существует ли пациент с указанным идентификатором
-    $checkPatientQuery = "SELECT * FROM patient WHERE id='$patientId'";
-    $checkPatientResult = $Link->query($checkPatientQuery);
+    $result = $Link->query($query);
+    if ($result === false) {
+        setHTTPSStatus("500", "Database query error: " . $Link->error);
+        return;
+    }
 
-    if ($checkPatientResult->num_rows == 1 && $checkTokenResult) {
-        // Если пациент найден, получаем данные из inspection
+    $allInspections = [];
 
-        $startRow = ($page - 1) * $size;
-        $endRow = $startRow + $size;
-        
-        // Формируем запрос для получения осмотров пациента
-        $listOfInspectionsQuery = "SELECT * FROM inspection WHERE idPatient='$patientId'";
-        
-        // Если grouped=true, сортируем осмотры по столбцу date
-        if ($grouped === 'true') {
-            $listOfInspectionsQuery .= " ORDER BY date DESC";
-        }
-        
-        // Добавляем лимит и оффсет для пагинации
-        $listOfInspectionsQuery .= " LIMIT $startRow, $size";
-        
-        $listOfInspectionsResult = $Link->query($listOfInspectionsQuery);
-        
-        if ($listOfInspectionsResult->num_rows > 0) {
-            $ArrayOfInspections = [];
-            
-            while ($row = $listOfInspectionsResult->fetch_assoc()) {
-                // Получаем id текущего осмотра
-                $inspectionId = $row['id'];
-                
-                // Формируем запрос для получения диагнозов, относящихся к текущему осмотру
-                $diagnosisQuery = "SELECT * FROM diagnosis WHERE idInspection='$inspectionId'";
-                $diagnosisResult = $Link->query($diagnosisQuery);
-                
-                // Создаем массив для хранения диагнозов текущего осмотра
-                $diagnoses = [];
-                
-                // Проверяем, есть ли результаты запроса диагнозов
-                if ($diagnosisResult->num_rows > 0) {
-                    while ($diagnosisRow = $diagnosisResult->fetch_assoc()) {
-                        // Добавляем каждый диагноз в массив
-                        $diagnoses[] = [
-                            'id' => $diagnosisRow['id'],
-                            'createTime' => $diagnosisRow['createTime'],
-                            'code' => $diagnosisRow['code'],
-                            'name' => $diagnosisRow['name'],
-                            'description' => $diagnosisRow['description'],
-                            'type' => $diagnosisRow['type']
-                        ];
-                    }
+    // Собираем все результаты без применения LIMIT
+    if ($result->num_rows > 0) {
+        while ($row = $result->fetch_assoc()) {
+            // Замена пустых значений на null
+            foreach ($row as $key => $value) {
+                if ($value === '') {
+                    $row[$key] = null;
                 }
-                
-                // Добавляем информацию о диагнозах к осмотру
-                $row['diagnoses'] = $diagnoses;
-                $ArrayOfInspections[] = $row;
+            }
+
+            if (!empty($icdRoots)) {
+                $icdRootsList = implode("','", array_map('intval', $icdRoots));
+                $diagnosisQuery = "SELECT * FROM diagnosis 
+                                   WHERE idInspection='{$row['id']}' 
+                                   AND type='Main' 
+                                   AND icdDiagnosisId IN ('$icdRootsList')";
+            } else {
+                $diagnosisQuery = "SELECT * FROM diagnosis 
+                                   WHERE idInspection='{$row['id']}' 
+                                   AND type='Main'";
             }
             
-            // Формируем объект JSON с осмотрами и пагинацией
-            $response = [
-                'inspections' => $ArrayOfInspections,
-                'pagination' => [
-                    'size' => $size,
-                    'count' => $listOfInspectionsResult->num_rows,
-                    'current' => $page
-                ]
-            ];
-            // Возвращаем данные в виде JSON
-            echo json_encode($response);
-            setHTTPSStatus("200", "inspections have been successfully received");
-        } else {
-            // Если осмотры не найдены, возвращаем статус 404 (Not Found)
-            setHTTPSStatus("404", "Inspections not found");
+            $diagnosisResult = $Link->query($diagnosisQuery);
+            $mainDiagnosis = $diagnosisResult->fetch_assoc();
+
+            if (!$mainDiagnosis) {
+                continue;
+            }
+            
+            // Замена пустых значений в диагнозах на null
+            foreach ($mainDiagnosis as $dKey => $dValue) {
+                if ($dValue === '') {
+                    $mainDiagnosis[$dKey] = null;
+                }
+            }
+
+            $row['diagnosis'] = $mainDiagnosis;
+            $row['hasChain'] = (bool)$row['hasChain'];
+            $row['hasNested'] = (bool)$row['hasNested'];
+            $allInspections[] = $row;
         }
-    } else {
-        // Если пациент не найден, возвращаем статус 404 (Not Found)
-        setHTTPSStatus("404", "Patient not found");
     }
+
+    // Рассчитываем общее количество страниц
+    $totalRecords = count($allInspections);
+    $totalPages = (int)ceil($totalRecords / $size); // Приводим к числу чтоб красиво всё было
+
+    // Выполняем пагинацию с помощью array_slice
+    //array_slice возвращает часть массива, начиная с указанного индекса и до заданной длины.
+    //например, 10 записей и мы хотим вывести по 5 на страницу, array_slice для page=2 вернет записи с 6-й по 10-ю.
+    $paginatedInspections = array_slice($allInspections, ($page - 1) * $size, $size);
+
+    echo json_encode([
+        'inspections' => $paginatedInspections,
+        'pagination' => [
+            'size' => $size,
+            'count' => $totalPages,  // количество возможных страниц
+            'current' => $page
+        ]
+    ]);
+    setHTTPSStatus("200", "Inspections have been successfully received");
 }
 
-function validateArguments($grouped, $icdRoots, $page, $size){
 
-    if (validatePaginationParameters($page, $size)&&($grouped==true or $grouped==false)){
-        if (!is_null($icdRoots)){
-            if (searchICD10Roots($icdRoots)){
+
+
+
+
+function validateArguments($grouped, $icdRoots, $page, $size) {
+    // Преобразуем icdRoots в массив, если это одиночное значение
+    if (!is_array($icdRoots) && !is_null($icdRoots)) {
+        $icdRoots = [$icdRoots];
+    }
+
+    if (validatePaginationParameters($page, $size) && ($grouped === 'true' || $grouped === 'false')) {
+        // Если icdRoots присутствует и не пустой, проверяем его
+        if (is_array($icdRoots) && !empty($icdRoots)) {
+            if (searchICD10Roots($icdRoots)) {
                 return true;
             }
             return false;
+        } elseif (is_null($icdRoots) || $icdRoots === "" || empty($icdRoots)) {
+            // Если icdRoots пустой или отсутствует, пропускаем проверку
+            return true;
+        } else {
+            setHTTPSStatus("400", "icdRoots must be an array if specified");
+            return false;
         }
-        return true;
     }
     return false;
 }
 
-function searchICD10Roots($icdRoots){
+
+function searchICD10Roots($icdRoots) {
     global $Link;
-    $query = "SELECT * FROM icd10 WHERE idParent IS NULL AND (id='$icdRoots' OR mkb_code='$icdRoots' OR mkb_name='$icdRoots')";
-    // Выполнение запроса
-    $result = $Link->query($query);
-        // Проверка на ошибку выполнения запроса
-    if (!$result) {
-        setHTTPSStatus("500", "InternalServerError");
-        return false;
+
+    // Проверяем каждый элемент массива icdRoots
+    foreach ($icdRoots as $root) {
+        $query = "SELECT * FROM icd10 WHERE idParent IS NULL AND (id='$root' OR mkb_code='$root' OR mkb_name='$root')";
+        $result = $Link->query($query);
+
+        if (!$result || $result->num_rows == 0) {
+            setHTTPSStatus("400", "Invalid argument(icdRoots) for filtration: $root not found");
+            return false;
+        }
     }
-        // Подготовка данных для ответа
-    $rootElements = [];
-    while ($row = $result->fetch_assoc()) {
-        $rootElements[] = $row;
-    
-    }
-    if (empty($rootElements)){ 
-        setHTTPSStatus("400", "Invalid argument(icdRoots) for filtration");
-        return false;
-    }
-    //setHTTPSStatus("200", "Root ICD10 is exist");
+
     return true;
 }
+
