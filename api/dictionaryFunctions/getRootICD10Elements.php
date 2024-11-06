@@ -19,7 +19,7 @@ function getRootICD10Elements() {
     $rootElements = [];
     while ($row = $result->fetch_assoc()) {
         $rootElements[] = $row;
-    }
+    }   
 
     // Формирование ответа в формате JSON
     echo json_encode($rootElements);

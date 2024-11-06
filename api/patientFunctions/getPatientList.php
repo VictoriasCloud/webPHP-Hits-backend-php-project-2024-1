@@ -1,71 +1,73 @@
 <?php
-
-function getPatientList(){
+// Сначала фильтрация идет по по имени и заключению — чтобы сузить выборку пациентов.
+// Затем добавляются фильтры по наличию запланированных визитов и критерию "Мои пациенты",
+// так как эти параметры могут далее сократить количество подходящих пациентов. 
+//В конце применяется сортировка, если данные уже отфильтрованы
+function getPatientList() {
     global $Link;
 
     $token = explode(' ', getallheaders()['Authorization'])[1];
     $checkTokenQuery = "SELECT * FROM token WHERE value='$token'";
-    $doctorId = $Link->query($checkTokenQuery)->fetch_assoc()['doctorId'];
+    $tokenResult = $Link->query($checkTokenQuery);
 
-    $name = $_GET['name'];
-    $conclusion = $_GET['conclusion']; // Поправил имя переменной
+    $doctorId = $tokenResult->fetch_assoc()['doctorId'];
 
-    $sorting = $_GET['sorting'];
-    $scheduledVisits = $_GET['scheduledVisits'];
-    $onlyMine = $_GET['onlyMine'];
-    $page = $_GET['page'];
-    $size = $_GET['size'];
+    $name = $_GET['name'] ?? null;
+    $conclusion = $_GET['conclusion'] ?? null;
+    $sorting = $_GET['sorting'] ?? null;
+    $scheduledVisits = $_GET['scheduledVisits'] ?? null;
+    $onlyMine = $_GET['onlyMine'] ?? null;
+    $page = $_GET['page'] ?? 1;
+    $size = $_GET['size'] ?? 5;
     $countOfPages = 0;
 
-    if (!validatePaginationParameters($page, $size)){
+    if (!validatePaginationParameters($page, $size)) {
         return;
     }
 
     if (checkToken($Link)) {
-        // Базовый запрос
         $sql = "SELECT * FROM patient";
-
         $conditions = [];
 
-        // Добавление фильтрации по имени
+        // Фильтрация по имени
         if (!empty($name)) {
+            $name = $Link->real_escape_string($name);
             $conditions[] = "name LIKE '$name%'";
         }
 
-        // Добавление фильтрации по заключениям осмотров
+        // Фильтрация по заключению
         if (!empty($conclusion)) {
-            $conclusion = $Link->real_escape_string($conclusion); // Защита от SQL инъекций
+            $conclusion = $Link->real_escape_string($conclusion);
             $result = $Link->query("SELECT DISTINCT idPatient FROM inspection WHERE conclusion = '$conclusion'");
             if ($result && $result->num_rows > 0) {
-                $patientIds = [];
-                while ($row = $result->fetch_assoc()) {
-                    $patientIds[] = $row['idPatient'];
-                }
+                $patientIds = array_column($result->fetch_all(MYSQLI_ASSOC), 'idPatient');
                 $conditions[] = "id IN (" . implode(",", $patientIds) . ")";
             } else {
-                echo "No patients found with the specified conclusion.";
+                setHTTPSStatus("404", "No patients found with the specified conclusion");
                 return;
             }
         }
 
-        // Добавление фильтрации по запланированным визитам
+        // Фильтрация по запланированным визитам
         if ($scheduledVisits == 'true') {
             $result = $Link->query("SELECT DISTINCT idPatient FROM inspection WHERE nextVisitDate IS NOT NULL");
             if ($result && $result->num_rows > 0) {
-                $patientIds = [];
-                while ($row = $result->fetch_assoc()) {
-                    $patientIds[] = $row['patient'];
-                }
+                $patientIds = array_column($result->fetch_all(MYSQLI_ASSOC), 'idPatient');
                 $conditions[] = "id IN (" . implode(",", $patientIds) . ")";
             } else {
-                echo "No patients found with scheduled visits.";
+                setHTTPSStatus("404", "No patients found with scheduled visits");
                 return;
             }
         }
 
-        // Добавление фильтрации по "Мои пациенты"
+        // Фильтрация по "Мои пациенты". пациенты, у которых есть хотя бы один осмотр, проведенный данным врачом
         if ($onlyMine == 'true') {
-            $conditions[] = "id IN (SELECT DISTINCT patient FROM inspection WHERE doctor = '$doctorId')";
+            $conditions[] = "id IN (SELECT DISTINCT idPatient FROM inspection WHERE idDoctor = '$doctorId')";
+        }
+
+        // Добавление условий по заключению
+        if (!empty($conditions)) {
+            $sql .= " WHERE " . implode(" AND ", $conditions);
         }
 
         // Добавление сортировки
@@ -83,51 +85,38 @@ function getPatientList(){
                 $sql .= " ORDER BY createTime DESC";
                 break;
             case 'inspectionDateAsc':
-                $sql .= " ORDER BY (SELECT MAX(createTime) FROM inspection WHERE patient = patients.id) ASC";
+                $sql .= " ORDER BY (SELECT MAX(createTime) FROM inspection WHERE idPatient = patient.id) ASC";
                 break;
             case 'inspectionDateDesc':
-                $sql .= " ORDER BY (SELECT MAX(createTime) FROM inspection WHERE patient = patients.id) DESC";
+                $sql .= " ORDER BY (SELECT MAX(createTime) FROM inspection WHERE idPatient = patient.id) DESC";
                 break;
-        }
-
-        if (!empty($conditions)) {
-            $sql .= " WHERE " . implode(" AND ", $conditions);
+            default:
+                break;
         }
 
         // Выполнение основного запроса
         $listOfPatients = $Link->query($sql);
-
-        if ($listOfPatients->num_rows > 0) {
-            $ArrayOfPatients = [];
-            $countOfPages = ceil($listOfPatients->num_rows / $size);
-            //начало и конец страницы
-            $startPage = $size * ($page - 1);
-            $finishPage = min(($startPage + ($size - 1)), ($listOfPatients->num_rows - 1));
-            $currentPage = 0;
-
-            while ($row = $listOfPatients->fetch_assoc() AND $currentPage <= $finishPage) {
-                if ($currentPage >= $startPage) {
-                    $ArrayOfPatients[] = $row;
-                }
-
-                $currentPage += 1;
-            }
-
-            $patientsOnPage = [];
-            $patientsOnPage['patients'] = $ArrayOfPatients;
-            $pagination = [];
-            $pagination['size'] = $size;
-            $pagination['count'] = $countOfPages;
-            $pagination['current'] = $page;
-            $patientsOnPage['pagination'] = $pagination;
-            echo json_encode($patientsOnPage);
-            setHTTPSStatus("200", "Patients paged list retrieved");
-        } elseif(!$listOfPatients) {
-            setHTTPSStatus("500", "InternalServerError");
-            return false;
+        if (!$listOfPatients) {
+            setHTTPSStatus("500", "InternalServerError: " . $Link->error);
+            return;
         }
-        else{
-            echo "Patients List is empty";
-        }
-    }return;
+
+        // Обработка результатов
+        $totalRecords = $listOfPatients->num_rows;
+        $countOfPages = (int) ceil($totalRecords / $size);
+        $startPage = ($page - 1) * $size;
+        $ArrayOfPatients = $listOfPatients->fetch_all(MYSQLI_ASSOC);
+        $paginatedPatients = array_slice($ArrayOfPatients, $startPage, $size);
+
+        // Формирование ответа
+        echo json_encode([
+            'patients' => $paginatedPatients,
+            'pagination' => [
+                'size' => (int)$size,
+                'count' => $countOfPages,
+                'current' => (int)$page,
+            ]
+        ]);
+        setHTTPSStatus("200");
+    }
 }

@@ -1,6 +1,35 @@
 
 <?php
 
+// Функция валидации данных доктора
+function validateDoctorData($password, $name, $email, $gender, $phone) {
+    $validationErrors = [];
+
+    if (!validateStringNotLess($password)) {
+        $validationErrors[] = ["password", "Password less than 6 characters long"];
+    }
+
+    if (!correctEmail($email)) {
+        $validationErrors[] = ["email", "Invalid email address"];
+    }
+
+    if (!correctPhoneNumber($phone)) {
+        $validationErrors[] = ["phone", "Invalid phone number"];
+    }
+
+    if (!validateName($name)) {
+        $validationErrors[] = ["name", "Invalid name"];
+    }
+
+    if (!validateGender($gender)) {
+        $validationErrors[] = ["gender", "Invalid gender value"];
+    }
+
+    return $validationErrors;
+}
+
+
+
 function validateConclusion($conclusion) {
     // Перечень допустимых значений
     $allowedValues = ['Disease', 'Recovery', 'Death'];
@@ -77,6 +106,32 @@ function validatePaginationParameters($page, $size) {
     if (empty($page) || empty($size)) {
         setHTTPSStatus("400", "Invalid arguments for pagination");
         return false;
+    }
+    return true;
+}
+
+function validateConclusionLogic($conclusion, $nextVisitDate, $deathDate, $patientId) {
+    switch ($conclusion) {
+        case "Disease":
+            if (is_null($nextVisitDate)) {
+                setHTTPSStatus("400", "Specify the date of the next visit.");
+                return false;
+            }
+            break;
+        case "Death":
+            if (!checkConclusionWithDeath($patientId)) {
+                return false;
+            }
+            if (is_null($deathDate)) {
+                setHTTPSStatus("400", "Specify the date of death.");
+                return false;
+            }
+            break;
+        case "Recovery":
+            break;
+        default:
+            setHTTPSStatus("400", "Invalid conclusion type");
+            return false;
     }
     return true;
 }

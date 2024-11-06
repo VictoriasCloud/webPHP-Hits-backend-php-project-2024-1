@@ -34,7 +34,6 @@ function editInspection($requestData) {
         setHTTPSStatus("403", "User doesn't have editing rights (not the inspection author)");
         return;
     }
-
     // Обновляем данные осмотра
     $anamnesis = $requestData->body->anamnesis;
     $complaints = $requestData->body->complaints;
@@ -62,6 +61,7 @@ function editInspection($requestData) {
         foreach ($requestData->body->diagnoses as $diagnosis) {
             $icdDiagnosisId = $diagnosis->icdDiagnosisId;
             $description = $diagnosis->description;
+            
             $type = $diagnosis->type;
 
             // Обновляем информацию о диагнозе

@@ -13,7 +13,7 @@
                         getConsultationById();
                         break;
                     case 'getAlistOfMedicalInspectionsForConsultation':
-                        //getAlistOfMedicalInspectionsForConsultation();
+                        getAlistOfMedicalInspectionsForConsultation();
                         break;
                     default:
                     //или 400 ошибка(неверный запрос к урлу)

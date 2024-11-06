@@ -5,7 +5,6 @@ function editProfile($requestData) {
     global $Link;
 
     $token=(explode(' ', getallheaders()['Authorization'])[1]);
-    echo $token;
     // Проверяем наличие токена
     if (!isset($token)) {
         // Если токен не передан, возвращаем статус 400 (Bad Request) с сообщением об ошибке
@@ -35,15 +34,12 @@ function editProfile($requestData) {
 
         if ($getUserResult->num_rows == 1) {
 
-            // Подготавливаем SQL-запрос для обновления профиля и выполняем запрос
             $editProfileQuery = "UPDATE doctor SET email='$email', name='$name', birthday='$birthday', gender='$gender', phone='$phone' WHERE id='$userId'";
             $editProfileResult = $Link->query($editProfileQuery);
 
             if ($editProfileResult) {
-                // Если обновление профиля выполнено успешно, возвращаем статус 200 (OK)
                 setHTTPSStatus("200");
             } else {
-                // Если произошла ошибка при обновлении профиля, возвращаем статус 500 (Internal Server Error) с сообщением об ошибке
                 setHTTPSStatus("500", $Link->error);
             }
         } else {
@@ -51,8 +47,7 @@ function editProfile($requestData) {
             setHTTPSStatus("404", "User not foun/not found");
         }
     } else {
-        // Если токен не найден, возвращаем статус 401 (Unauthorized)
         setHTTPSStatus("401", "Unauthorized");
     }
 }
-?>
+

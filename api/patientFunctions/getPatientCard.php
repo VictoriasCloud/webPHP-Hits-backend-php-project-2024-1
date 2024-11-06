@@ -1,24 +1,24 @@
 <?php
-function getPatientCard() {
+function getPatientCard($patientId) {
     global $Link;
 
-    $checkTokenResult=checkToken($Link);
-    $patientId= $_GET['id'];
+    //получение основной информации о пациенте
+    $patientQuery = "SELECT name, birthday, gender, id, createTime FROM patient WHERE id = '$patientId'";
+    $patientResult = $Link->query($patientQuery);
 
-    // Проверяем, существует ли пациент с указанным идентификатором
-    $checkPatientQuery = "SELECT * FROM patient WHERE id='$patientId'";
-    $checkPatientResult = $Link->query($checkPatientQuery);
+    // Проверка на ошибку выполнения запроса
+    if ($patientResult === false) {
+        setHTTPSStatus("500", "Internal Server Error: " . $Link->error);
+        return;
+    }
 
-    if (($checkPatientResult->num_rows == 1) && $checkTokenResult) {
-        // Если пациент найден, извлекаем данные из базы данных
-        $patientData = $checkPatientResult->fetch_assoc();
+    if ($patientResult && $patientResult->num_rows > 0) {
+        $patientData = $patientResult->fetch_assoc();
 
-        // Возвращаем данные пациента в виде JSON
         echo json_encode($patientData);
-        setHTTPSStatus("200", "Success");
-
+        setHTTPSStatus("200");
     } else {
-        // Если пациент не найден, возвращаем статус 404 (Not Found)
         setHTTPSStatus("404", "Patient not found");
     }
 }
+
