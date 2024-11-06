@@ -1,59 +1,94 @@
 <?php
-function getAlistOfPatientMedicalInspections($patientId, $params) {
+function getAlistOfPatientMedicalInspections($patientId, $params) { 
     global $Link;
     
     $checkTokenResult = checkToken($Link);
     $grouped = $params['grouped'] ?? 'false';
-    $icdRoots = $params['icdRoots'] ?? [];
-    $page = $params['page'] ?? 1;
-    $size = $params['size'] ?? 10;
+    $page = (int)($params['page'] ?? 1);  // Приводим к числу для консистентности
+    $size = (int)($params['size'] ?? 5);  // Приводим к числу для консистентности
 
-    // Преобразуем icdRoots в массив, если это одиночное значение
-    if (!is_array($icdRoots) && !is_null($icdRoots)) {
-        $icdRoots = [$icdRoots];
-    }
-    
-    $startRow = ($page - 1) * $size;
-    
-    // Строим запрос в зависимости от grouped
+    // Собираем все значения icdRoots
+    $icdRoots = $params['icdRoots'] ?? [];
+
+    // Изменяем запрос, чтобы сначала выбрать все записи с фильтрацией, а затем выполнять пагинацию в PHP
     $query = "SELECT * FROM inspection WHERE idPatient='$patientId'";
     if ($grouped === 'true') {
-        $query .= " AND previousInspectionId IS NULL";
+        $query .= " AND previousInspectionId=''";
     }
-    $query .= " LIMIT $startRow, $size";
     
     $result = $Link->query($query);
-    $inspections = [];
+    if ($result === false) {
+        setHTTPSStatus("500", "Database query error: " . $Link->error);
+        return;
+    }
 
+    $allInspections = [];
+
+    // Собираем все результаты без применения LIMIT
     if ($result->num_rows > 0) {
         while ($row = $result->fetch_assoc()) {
-            $diagnosisQuery = "SELECT * FROM diagnosis WHERE idInspection='{$row['id']}' AND type='Main'";
+            // Замена пустых значений на null
+            foreach ($row as $key => $value) {
+                if ($value === '') {
+                    $row[$key] = null;
+                }
+            }
+
+            if (!empty($icdRoots)) {
+                $icdRootsList = implode("','", array_map('intval', $icdRoots));
+                $diagnosisQuery = "SELECT * FROM diagnosis 
+                                   WHERE idInspection='{$row['id']}' 
+                                   AND type='Main' 
+                                   AND icdDiagnosisId IN ('$icdRootsList')";
+            } else {
+                $diagnosisQuery = "SELECT * FROM diagnosis 
+                                   WHERE idInspection='{$row['id']}' 
+                                   AND type='Main'";
+            }
+            
             $diagnosisResult = $Link->query($diagnosisQuery);
             $mainDiagnosis = $diagnosisResult->fetch_assoc();
 
-            // Проверка: если diagnosis.icdDiagnosisId не в icdRoots, пропускаем осмотр
-            if (!empty($icdRoots) && !in_array($mainDiagnosis['icdDiagnosisId'], $icdRoots)) {
+            if (!$mainDiagnosis) {
                 continue;
             }
             
-            // Если диагноз прошёл фильтр, добавляем его и другие данные в результат
+            // Замена пустых значений в диагнозах на null
+            foreach ($mainDiagnosis as $dKey => $dValue) {
+                if ($dValue === '') {
+                    $mainDiagnosis[$dKey] = null;
+                }
+            }
+
             $row['diagnosis'] = $mainDiagnosis;
             $row['hasChain'] = (bool)$row['hasChain'];
             $row['hasNested'] = (bool)$row['hasNested'];
-            $inspections[] = $row;
+            $allInspections[] = $row;
         }
     }
-    
+
+    // Рассчитываем общее количество страниц
+    $totalRecords = count($allInspections);
+    $totalPages = (int)ceil($totalRecords / $size); // Приводим к числу для единообразия
+
+    // Выполняем пагинацию с помощью array_slice
+    $paginatedInspections = array_slice($allInspections, ($page - 1) * $size, $size);
+
+    // Ответ с учетом новой пагинации и пересчитанного количества страниц
     echo json_encode([
-        'inspections' => $inspections,
+        'inspections' => $paginatedInspections,
         'pagination' => [
             'size' => $size,
-            'count' => count($inspections),
+            'count' => $totalPages,  // количество возможных страниц
             'current' => $page
         ]
     ]);
-    setHTTPSStatus("200");
+    setHTTPSStatus("200", "Inspections have been successfully received");
 }
+
+
+
+
 
 
 function validateArguments($grouped, $icdRoots, $page, $size) {

@@ -15,6 +15,7 @@ function route($method, $urlList, $requestData) {
         case 'GET':
             if ($patientId !== null && isset($urlList[3]) && $urlList[3] === 'inspections') {
                 getAlistOfPatientMedicalInspections($patientId, $requestData->parameters);
+                //var_dump($requestData->parameters); 
             } else {
                 setHTTPSStatus("404", "Invalid GET route for patient");
             }

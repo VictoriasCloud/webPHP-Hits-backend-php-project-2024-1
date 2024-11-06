@@ -33,7 +33,8 @@ $urlList = explode('/', $url);
 
 $router2 = $urlList[0] ?? '';
 $router = $urlList[1] ?? '';
-$requestData = getData(getMethod());
+$requestData = getDataа(getMethod());
+//var_dump($requestData); 
 $method = getMethod();
 
 if (file_exists(realpath(dirname(__FILE__)) . '/' . $router2 . '/' . $router . '.php')) {
@@ -44,3 +45,40 @@ if (file_exists(realpath(dirname(__FILE__)) . '/' . $router2 . '/' . $router . '
 }
 
 mysqli_close($Link);
+
+function getDataа($method) {
+    $data = new stdClass();
+    
+    if ($method != "GET") {
+        $data->body = json_decode(file_get_contents('php://input')); 
+    }
+
+    // Инициализация параметров
+    $data->parameters = [];
+    
+    // Ручной разбор строки запроса для сбора всех значений icdRoots
+    if (isset($_SERVER['QUERY_STRING'])) {
+        $queryArray = explode('&', $_SERVER['QUERY_STRING']);
+        $icdRoots = [];
+
+        foreach ($queryArray as $param) {
+            list($key, $value) = explode('=', $param);
+            $value = urldecode($value); // Декодируем значение
+
+            if ($key === 'icdRoots') {
+                // Добавляем все значения icdRoots в массив
+                $icdRoots[] = $value;
+            } else {
+                $data->parameters[$key] = $value;
+            }
+        }
+
+        // Устанавливаем массив icdRoots
+        if (!empty($icdRoots)) {
+            $data->parameters['icdRoots'] = $icdRoots;
+        }
+    }
+    
+    return $data;
+}
+
