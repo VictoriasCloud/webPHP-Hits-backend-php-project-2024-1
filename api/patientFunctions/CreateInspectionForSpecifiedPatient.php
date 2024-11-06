@@ -1,264 +1,201 @@
 <?php
+function CreateInspectionForSpecifiedPatient($Link, $patientId, $requestData) {
 
-function CreateInspectionForSpecifiedPatient($Link, $requestData) {
-    // Проверка токена
-    if (!checkToken($Link)) {
-        setHTTPSStatus("401", "Unauthorized");
+    // Проверка существования пациента
+    $patientCheck = $Link->query("SELECT * FROM patient WHERE id='$patientId'");
+    if ($patientCheck->num_rows !== 1) {
+        setHTTPSStatus("404", "Patient not found");
         return;
     }
 
-    $idPatient=$_GET['idPatient'];
-    $patientCheck=$Link->query("SELECT * from patient Where id='$idPatient'");
-    //проверка, что такой пациент существует
-    if ($patientCheck->num_rows!==1){
-        setHTTPSStatus("400", "Patient's identifier not found");
-        return;
+    // Проверка на существование осмотра с заключением смееерть
+    if (!checkConclusionWithDeath($patientId)) {
+        return 0;
     }
 
-    // Подготовка данных для вставки в базу данных
-    $date = $requestData->body->date;
-    $anamnesis = $requestData->body->anamnesis;
-    $complaints = $requestData->body->complaints;
-    $treatment = $requestData->body->treatment;
-    $conclusion = $requestData->body->conclusion;
-    $nextVisitDate = $requestData->body->nextVisitDate;
-    $deathDate =$requestData->body->deathDate;
-    $previousInspectionId =$requestData->body->previousId;
+    //Извлечение данных
+    $date = $requestData->date;
     $createTime = date('Y-m-d\TH:i:s.u');
-    $date=$createTime;
-    //проверяем есть ли мэйн диагноз
-    if (checkMainDiagnosisCount($requestData)){
+    // Проверка, что дата не больше текущего времени
+    if (!checkCreateTimeAndPresentTime($date)) {
+        return;  
+    }
 
-        // Проверка, что дата создания осмотра не больше предыдущего осмотра
-        if (!is_null($previousInspectionId)){
-            if(!checkDatePreviousInspection($Link, $previousInspectionId, $createTime)){
-                return;
-            }
-        }
-        //проверка, что дата создания осмотра не больше настоящего времени
-        if(!checkCreateTimeAndPresentTime($createTime)){
+    $anamnesis = $requestData->anamnesis;
+    $complaints = $requestData->complaints;
+    $treatment = $requestData->treatment;
+    $conclusion = $requestData->conclusion;
+    $nextVisitDate = $requestData->nextVisitDate ?? null;
+    $deathDate = $requestData->deathDate ?? null;
+    $previousInspectionId = $requestData->previousInspectionId ?? null;
+    $diagnoses = $requestData->diagnoses ?? [];
+
+
+    // Валидация на наличие диагноза и дат для каждого типа заключения
+    if (!validateConclusionLogic($conclusion, $nextVisitDate, $deathDate, $patientId)) {
+        return;
+    }
+
+    // Очистка дат в зависимости от типа заключения
+    if ($conclusion === "Death") {
+        $nextVisitDate = null; 
+    } elseif ($conclusion === "Disease") {
+        $deathDate = null; 
+    } elseif ($conclusion === "Recovery") {
+        $nextVisitDate = null;
+        $deathDate = null; 
+    }
+
+    // Проверка наличия основного диагноза (одного и только одного типа "Main") для всех типов диагнозов
+    if (!empty($diagnoses) && !checkMainDiagnosisCount($requestData)) {
+        return;
+    }
+
+    // Определение врача чтобы вставить его пйди в осмотр
+    $token = explode(' ', getallheaders()['Authorization'])[1];
+    $checkTokenQuery = "SELECT * FROM token WHERE value='$token'";
+    $idDoctor = $Link->query($checkTokenQuery)->fetch_assoc()['doctorId'];
+
+    // Вставка осмотра
+    $idInspection = insertInspection($Link, $date, $createTime, $anamnesis, $complaints, $treatment, $conclusion, $nextVisitDate, $deathDate, $previousInspectionId, $idDoctor, $patientId);
+
+    if ($idInspection) {
+        if (!insertDiagnosis($requestData, $idInspection, $createTime)) {
             return;
         }
-        //проверка заключения
-        switch ($conclusion) {
-            //при выборе заключения “Болезнь”, необходимо указать дату и время следующего визита,
-            case "Disease":
-                if (is_null($nextVisitDate)){
-                    setHTTPSStatus("400", "Specify the date of the next visit.");
-                }
-                break;
-            // при выборе заключения “Смерть”, необходимо указать дату и время смерти
-            case "Death":
-                //у пациента не может быть более одного осмотра с заключением “Смерть”;
-                if(checkConclusionWithDeath($idPatient)){
-                    if (is_null($deathDate)){
-                        setHTTPSStatus("400", "Specify the date of death.");
-                        return;
-                    }
-                }
-                else{
-                    echo "conclusion=bad";
+        if (!insertConsultation($requestData, $idInspection, $createTime, $idDoctor, $patientId)) {
+            return;
+        }
+        echo json_encode(['id' => $idInspection]);
+        setHTTPSStatus("200");
+    } else {
+        return;
+    }
+    
+}
+
+
+function insertInspection($Link, $date, $createTime, $anamnesis, $complaints, $treatment, $conclusion, $nextVisitDate, $deathDate, $previousInspectionId, $idDoctor, $idPatient) {
+    // Устанавливаем значение hasChain для нового осмотра на false
+    //логика такрва, что hasChain=true толко в том случае, 
+    //если создаётся первый дочерний осмотр у осмотра. определяем, что первый по previousInspectionId=0
+    $hasChain = 0; 
+
+    // Если previousInspectionId не пустой, выполняем проверку и обновление hasChain для предыдущего осмотра
+    if (!empty($previousInspectionId)) {
+        // Проверяем существование осмотра с данным previousInspectionId
+        $checkPreviousInspection = $Link->query("SELECT id, hasChain FROM inspection WHERE id = '$previousInspectionId'");
+        
+        if ($checkPreviousInspection->num_rows > 0) {
+            $previousInspection = $checkPreviousInspection->fetch_assoc();
+
+            // Обновляем hasChain для родительского осмотра на true, если это первый дочерний осмотр
+            if ($previousInspection['hasChain'] == 0) {
+                $updatePrevious = $Link->query("UPDATE inspection SET hasChain = 1 WHERE id = '$previousInspectionId'");
+                if (!$updatePrevious) {
+                    setHTTPSStatus("500", "Failed to update hasChain for previous inspection: " . $Link->error);
                     return 0;
                 }
-                break;
-            // Ничего не требуется делать при заключении "Выздоровление"
-            case "Recovery":
-                break;
-            default:
-                return "Error: Invalid conclusion.";
-        }
-        $token=explode(' ', getallheaders()['Authorization'])[1];
-        $checkTokenQuery = "SELECT * FROM token WHERE value='$token'";
-        $idDoctor = $Link->query($checkTokenQuery)->fetch_assoc()['doctorId'];
-
-        $idInspection=insertInspection($Link, $date, $createTime, $anamnesis,$complaints, $treatment,$conclusion, $nextVisitDate, $deathDate, $previousInspectionId, $idDoctor, $idPatient);
-        
-        if ($idInspection!=0){
-            
-            if(insertDiagnosis($requestData, $idInspection, $createTime)){
-                echo "диагнозы вставлены";
             }
-            if(insertConsultation($requestData, $idInspection, $createTime, $idDoctor, $idPatient)){
-                echo "консультации вставлены";
-            }
-        }
-        echo "осмотры вставлены";
-
-    }
-    return;
-}
-
-function checkConclusionWithDeath($idPatient){
-    global $Link;
-    $countDeath = $Link->query("SELECT COUNT(*) AS death_count FROM inspection WHERE idPatient = '$idPatient' AND conclusion = 'Death'")->fetch_assoc()['death_count'];
-    if ($countDeath==0){
-        return true;
-    }
-    setHTTPSStatus("400", "The patient already has a 'death' in the inspection.");
-    return false;
-
-}
-
-// Проверка, что дата создания осмотра не больше настоящего времени
-function checkCreateTimeAndPresentTime($createTime){
-    $presentTime= date('Y-m-d\TH:i:s.u');
-    if ($createTime<=$presentTime){
-        return true;
-    }
-    else{
-        setHTTPSStatus("400", "Problems with time of inspection");
-        return false;
-    }
-}
-
-// Проверка, что дата создания осмотра не больше предыдущего
-function checkDatePreviousInspection($Link, $previousInspectionId, $createTime){
-    $previousInspectionResult = $Link->query("SELECT date FROM inspection WHERE id='$previousInspectionId'");
-    $previousInspectionDate = $previousInspectionResult;
-    if ($previousInspectionDate<$createTime){
-        return true;
-    }
-    setHTTPSStatus("400", "Problems with time of inspection");
-    return false;
-}
-
-// Проверка наличия хотя бы одного диагноза с типом "Main"
-function checkMainDiagnosisCount($requestData){
-    $mainDiagnosisCount = 0;
-
-    if (isset($requestData->body->diagnoses) && is_array($requestData->body->diagnoses)) {
-        foreach ($requestData->body->diagnoses as $diagnosis) {
-            $type = $diagnosis->type;
-
-            if ($type === "Main") {
-                $mainDiagnosisCount++;
-            }
+        } else {
+            setHTTPSStatus("400", "Previous inspection with ID $previousInspectionId not found.");
+            return 0;
         }
     }
-    if ($mainDiagnosisCount !== 1) {
-        setHTTPSStatus("400", "Invalid diagnoses. Inspection must have exactly one Main diagnosis.");
-        return false;
-    }
-    return true;
 
-}
+    // Создание нового осмотра с hasChain = 0 и (возможно) previousInspectionId
+    $insertQuery = "INSERT INTO inspection (date, createTime, anamnesis, complaints, treatment, conclusion, nextVisitDate, deathDate, previousInspectionId, hasChain, idDoctor, idPatient) 
+                    VALUES ('$date', '$createTime', '$anamnesis', '$complaints', '$treatment', '$conclusion', '$nextVisitDate', '$deathDate', '$previousInspectionId', $hasChain, '$idDoctor', '$idPatient')";
 
-function insertInspection($Link, $date, $createTime, $anamnesis,$complaints, $treatment,$conclusion, $nextVisitDate, $deathDate, $previousInspectionId, $idDoctor, $idPatient){
-    // Создание запроса для вставки данных в базу данных
-    $insertQuery = "INSERT INTO inspection (date, createTime, anamnesis, complaints, treatment, conclusion, nextVisitDate, deathDate, previousInspectionId, idDoctor, idPatient ) 
-                    VALUES ('$date', '$createTime', '$anamnesis', '$complaints', '$treatment', '$conclusion', '$nextVisitDate', '$deathDate', '$previousInspectionId', '$idDoctor', '$idPatient')";
 
-    // Выполнение запроса
     if ($Link->query($insertQuery)) {
-        // Отправка успешного статуса
-        setHTTPSStatus("200", "Inspection created successfully");
     } else {
-        // Отправка статуса ошибки
-        setHTTPSStatus("500", "Error occurred while creating inspection");
+        setHTTPSStatus("500", "Error occurred while creating inspection: " . $Link->error);
+        return 0;
     }
-    // Запрос для поиска idInspection по createTime
-    $selectQuery = "SELECT id FROM inspection WHERE createTime = '$createTime'";
-    $result = $Link->query($selectQuery);
-    // Проверка результатов запроса
-    if ($result->num_rows > 0) {
-        $idInspection = $result->fetch_assoc()['id'];
-        // Возвращаем idInspection
-        return $idInspection;
-    }
-    return 0;
+
+    // Получаем айди нового осмотра
+    $idInspection = $Link->insert_id;
+    return $idInspection;
 }
 
-function insertDiagnosis($requestData, $inspectionId, $createTime){
+
+function insertDiagnosis($requestData, $inspectionId, $createTime) {
     global $Link;
-    // Добавляем диагнозы
-    if (isset($requestData->body->diagnoses) && is_array($requestData->body->diagnoses)) {
-        foreach ($requestData->body->diagnoses as $diagnosis) {
+
+    if (isset($requestData->diagnoses) && is_array($requestData->diagnoses)) {
+        foreach ($requestData->diagnoses as $diagnosis) {
             $icdDiagnosisId = $diagnosis->icdDiagnosisId;
             $description = $diagnosis->description;
             $type = $diagnosis->type;
-            $name= $Link->query("SELECT * FROM icd10 WHERE id='$icdDiagnosisId'")->fetch_assoc()['mkb_name'];
-            $code= $Link->query("SELECT * FROM icd10 WHERE id='$icdDiagnosisId'")->fetch_assoc()['mkb_code'];
-
-            // Вставляем диагноз в таблицу diagnosis
-            $diagnosisInsertResult = $Link->query("INSERT INTO diagnosis(icdDiagnosisId, description, type, idInspection, createTime, name, code) VALUES('$icdDiagnosisId', '$description', '$type', '$inspectionId', '$createTime', '$name', '$code')");
-            if (!$diagnosisInsertResult){
-                setHTTPSStatus("500", "InternalServerError");
+            
+            // Получение имени и кода из таблицы icd10
+            $icdData = $Link->query("SELECT mkb_name, mkb_code FROM icd10 WHERE id='$icdDiagnosisId'")->fetch_assoc();
+            
+            if ($icdData) {
+                $name = $icdData['mkb_name'];
+                $code = $icdData['mkb_code'];
+            } else {
+                setHTTPSStatus("400", "ICD diagnosis not found for id: $icdDiagnosisId");
                 return false;
             }
+            
+            // Вставляем диагноз в таблицу
+            $diagnosisInsertResult = $Link->query("INSERT INTO diagnosis (icdDiagnosisId, description, type, idInspection, createTime, name, code) VALUES ('$icdDiagnosisId', '$description', '$type', '$inspectionId', '$createTime', '$name', '$code')");
+            
+            if (!$diagnosisInsertResult) {
+                setHTTPSStatus("500", "InternalServerError: " . $Link->error);
+                return false;
+            }
+            
         }
-        setHTTPSStatus("200", "Diagnosis was inserted successfully.");
-
     }
     return true;
 }
 
-function insertConsultation($requestData, $inspectionId, $createTime, $idDoctor, $idPatient){
+
+function insertConsultation($requestData, $inspectionId, $createTime, $idDoctor, $idPatient) {
     global $Link;
-
-    $consultations=$requestData->body->consultations;
-    // Добавляем консультации 
-    if (isset($consultations) && is_array($consultations)) { 
-        foreach ($consultations as $consultation) { 
-            $specialityId = $consultation->specialityId; 
-            //проверка на уникальность специальности
-            //array_column() извлекает (specialityId) и формирует новый массив
-            //array_unique() удаляет повторяющиеся значения из массива. 
+    $consultations = $requestData->consultations ?? [];
+    if (isset($consultations) && is_array($consultations)) {
+        foreach ($consultations as $consultation) {
+            $specialityId = $consultation->specialityId;
             $uniqueSpecialities = array_unique(array_column($consultations, 'specialityId'));
-
             if (count($uniqueSpecialities) !== count($consultations)) {
-                setHTTPSStatus("400", "An examination cannot have multiple consultations with the same doctor's specialty;");
+                setHTTPSStatus("400", "An examination cannot have multiple consultations with the same doctor's specialty.");
                 return false;
             }
-
-            // Вставляем консультацию в таблицу consultation
-            $consultationInsertResult = $Link->query("INSERT INTO consultation(inspectionId, specialityId, createTime, idDoctor, idPatient) VALUES('$inspectionId', '$specialityId', '$createTime', '$idDoctor', '$idPatient')"); 
-            if($consultationInsertResult){
-
-                $idConsultation = $Link->query("SELECT id FROM consultation WHERE inspectionId = '$inspectionId' AND specialityId = '$specialityId'")->fetch_assoc()['id'];
-                if(insertCommentFromParentId($Link, $consultation, $idConsultation, $idDoctor)){
-
-                    $idParentComment = $Link->query("SELECT id FROM comments WHERE idConsultation = '$idConsultation' AND parentId = 'null'");
-                    
-                    $resultParentComment = $Link->query("INSERT INTO consultation(idParentComment) VALUES('$idParentComment')"); 
-                    if($resultParentComment){
-                        setHTTPSStatus("200", "Consultation was inserted successfully.");
-                        return true;
-                    }
-                }
+            $consultationInsertResult = $Link->query("INSERT INTO consultation(inspectionId, specialityId, createTime, idDoctor, idPatient) VALUES('$inspectionId', '$specialityId', '$createTime', '$idDoctor', '$idPatient')");
+            if (!$consultationInsertResult) {
+                setHTTPSStatus("500", "Error inserting consultation: " . $Link->error);
                 return false;
             }
-        } 
-    } 
-    setHTTPSStatus("500", $Link->error);
-    return false;
-}
-
-//функция добавления комментария
-function insertCommentFromParentId($Link, $consultation, $idConsultation, $doctorId){
-    // Добавляем комментарий для консультации 
-    $token=(explode(' ', getallheaders()['Authorization'])[1]);
-    //$checkTokenResult = $Link->query("SELECT * FROM token WHERE value='$token'");
-    //$doctorId = $checkTokenResult->fetch_assoc()['doctorId'];
-    $parentId='null';
-    $commentContent = $consultation->comment->content; 
-    $commentAuthorId = $doctorId; 
-
-    $queryResult = $Link->query("SELECT name FROM doctor WHERE id='$doctorId'");
-    $row = $queryResult->fetch_assoc();
-    $commentAuthorName = $row['name'];
-
-    //echo $commentAuthorName;
-    if (is_null($commentContent)){
-        setHTTPSStatus("400", "The comment field is empty, it was not possible to insert a comment.");
-        return 0;
-    }
-    $createTime= date('Y-m-d\TH:i:s.u');
-    $commentInsertResult = $Link->query("INSERT INTO comments(createTime, content, authorId, nameAuthor, idConsultation) VALUES('$createTime','$commentContent', '$commentAuthorId', '$commentAuthorName', '$idConsultation')"); 
-    if ($commentInsertResult){
-        setHTTPSStatus("200", "Comment was inserted successfully.");
+            $idConsultation = $Link->insert_id;
+            if (!insertComment($Link, $consultation, $idConsultation, $idDoctor)) {
+                setHTTPSStatus("500", "Error inserting comment for consultation.");
+                return false;
+            }
+        }
         return true;
     }
-    setHTTPSStatus("500", $Link->error);
+    setHTTPSStatus("500", "No consultations provided.");
     return false;
+}
+function insertComment($Link, $consultation, $idConsultation, $doctorId) {
+    $commentContent = $consultation->comment->content ?? null;
+    if (is_null($commentContent)) {
+        setHTTPSStatus("400", "The comment field is empty.");
+        return false;
+    }
+    
+    $createTime = date('Y-m-d\TH:i:s.u'); 
+    $commentInsertResult = $Link->query("INSERT INTO comments (createTime, content, authorId, idConsultation) VALUES ('$createTime', '$commentContent', '$doctorId', '$idConsultation')");
+    
+    if (!$commentInsertResult) {
+        setHTTPSStatus("500", "Error inserting comment: " . $Link->error);
+        return false;
+    }
+    
+    return true;
 }
 

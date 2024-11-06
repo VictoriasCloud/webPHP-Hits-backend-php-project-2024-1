@@ -5,6 +5,10 @@ include_once "patientFunctions/getPatientList.php";
 include_once "patientFunctions/getAlistOfPatientMedicalInspections.php";
 include_once "patientFunctions/CreateInspectionForSpecifiedPatient.php";
 include_once "patientFunctions/SearchForPatientWithoutChildInspections.php";
+include_once "helpers/validations.php";
+include_once "helpers/checksForPatient.php";
+
+
 
 function route($method, $urlList, $requestData) {
     global $Link;
@@ -41,7 +45,7 @@ function route($method, $urlList, $requestData) {
 
         case 'POST':
             if ($patientId !== null && isset($urlList[3]) && $urlList[3] === 'inspections') {
-                CreateInspectionForSpecifiedPatient($Link, $patientId, $requestData);
+                CreateInspectionForSpecifiedPatient($Link, $patientId, $requestData->body);
             } 
             elseif ($patientId === null && count($urlList) == 2 && $urlList[1] === 'patient') {
                 createNewPatient($requestData);
