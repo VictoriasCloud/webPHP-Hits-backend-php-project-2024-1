@@ -56,6 +56,18 @@ function CreateInspectionForSpecifiedPatient($Link, $patientId, $requestData) {
     $checkTokenQuery = "SELECT * FROM token WHERE value='$token'";
     $idDoctor = $Link->query($checkTokenQuery)->fetch_assoc()['doctorId'];
 
+    // Проверка, что previousInspectionId не имеет дочерних осмотров
+    if (!empty($previousInspectionId)) {
+        $childCheckQuery = "SELECT COUNT(*) AS child_count FROM inspection WHERE previousInspectionId = '$previousInspectionId'";
+        $childCheckResult = $Link->query($childCheckQuery);
+        $childCount = $childCheckResult->fetch_assoc()['child_count'];
+        
+        if ($childCount > 0) {
+            setHTTPSStatus("400", "The inspection with ID $previousInspectionId already has a child inspection.");
+            return;
+        }
+    }
+
     // Вставка осмотра
     $idInspection = insertInspection($Link, $date, $createTime, $anamnesis, $complaints, $treatment, $conclusion, $nextVisitDate, $deathDate, $previousInspectionId, $idDoctor, $patientId);
 
