@@ -1,6 +1,35 @@
 
 <?php
 
+// Функция валидации данных доктора
+function validateDoctorData($password, $name, $email, $gender, $phone) {
+    $validationErrors = [];
+
+    if (!validateStringNotLess($password)) {
+        $validationErrors[] = ["password", "Password less than 6 characters long"];
+    }
+
+    if (!correctEmail($email)) {
+        $validationErrors[] = ["email", "Invalid email address"];
+    }
+
+    if (!correctPhoneNumber($phone)) {
+        $validationErrors[] = ["phone", "Invalid phone number"];
+    }
+
+    if (!validateName($name)) {
+        $validationErrors[] = ["name", "Invalid name"];
+    }
+
+    if (!validateGender($gender)) {
+        $validationErrors[] = ["gender", "Invalid gender value"];
+    }
+
+    return $validationErrors;
+}
+
+
+
 function validateConclusion($conclusion) {
     // Перечень допустимых значений
     $allowedValues = ['Disease', 'Recovery', 'Death'];

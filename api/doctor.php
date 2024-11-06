@@ -28,7 +28,6 @@
                         logout(explode(' ', getallheaders()['Authorization'])[1]);
                         break;
                     default:
-                    //или 400 ошибка(неверный запрос к урлу)
                         setHTTPSStatus("404", "There is no such path as 'account/$urlList[1]'");
                         break;             
                 }                  
@@ -43,7 +42,6 @@
                 break;
             
             default:
-                //или 400 ошибка(неверный запрос к урлу/синтаксическая ошибка)
                 setHTTPSStatus("404", "There is no such method here");
                 break;
         }

@@ -1,6 +1,4 @@
 <?php
-
-// Функция регистрации доктора
 function registerDoctor($requestData) {
     global $Link;
 
@@ -21,7 +19,7 @@ function registerDoctor($requestData) {
     if (!empty($validationErrors)) {
         $validationMessage = "";
         foreach ($validationErrors as $err) {
-            $validationMessage .= "$err[0]: $err[1] \n";
+            $validationMessage .= "$err[0]: $err[1]";
         }
         setHTTPSStatus("400", $validationMessage);
         return;
@@ -31,7 +29,7 @@ function registerDoctor($requestData) {
     //не надо,поставила автоинкрементом $id = generate_uuid();
     $token = generateToken();
 
-    // Вставка данных в базу данных
+    // Вставка данных в бд
     $userInsertResult = $Link->query("INSERT INTO doctor(name, password, email, birthday, gender, phone, speciality) VALUES('$name', '$password', '$email', '$birthday',  '$gender', '$phone', '$speciality')");
     if (!$userInsertResult) {
         if ($Link->errno == 1062) {
@@ -39,48 +37,17 @@ function registerDoctor($requestData) {
             return;
         }
     } else {
-        // Вставка токена в базу данных
-        echo "ураааа";
+        // Вставка токена в бд
         $timeToValid = date('Y-m-d\TH:i:s.u');
         $doctorInfo=$Link->query("SELECT email, id FROM doctor WHERE email='$email'")->fetch_assoc();
         $doctorId=$doctorInfo['id'];
         $tokenInsertResult = $Link->query("INSERT INTO token(value, doctorId, createTime) VALUES('$token', '$doctorId', '$timeToValid')");
 
         if (!$tokenInsertResult) {
-            // В случае ошибки вставки токена, возвращаем статус 500 и сообщение об ошибке
             setHTTPSStatus("500", $Link->error);
         } else {
-            // Возвращаем успешный ответ с токеном
-            echo "ураааа";
             echo json_encode(['token' => $token]);
         }
     }
-}
-
-// Функция валидации данных доктора
-function validateDoctorData($password, $name, $email, $gender, $phone) {
-    $validationErrors = [];
-
-    if (!validateStringNotLess($password)) {
-        $validationErrors[] = ["password", "Пароль менее 6 символов"];
-    }
-
-    if (!correctEmail($email)) {
-        $validationErrors[] = ["email", "Некорректный адрес электронной почты"];
-    }
-
-    if (!correctPhoneNumber($phone)) {
-        $validationErrors[] = ["phone", "Некорректный номер телефона"];
-    }
-
-    if (!validateName($name)) {
-        $validationErrors[] = ["name", "Имя менее 1 символа"];
-    }
-
-    if (!validateGender($gender)) {
-        $validationErrors[] = ["gender", "Некорректное значение пола"];
-    }
-
-    return $validationErrors;
 }
 
