@@ -2,10 +2,9 @@
 function getAlistOfPatientMedicalInspections($patientId, $params) { 
     global $Link;
     
-    $checkTokenResult = checkToken($Link);
 
-    $checkTokenResult = checkToken($Link);  // Проверяем токен
-    if (!$checkTokenResult) {  // Если токен недействителен
+    $checkTokenResult = checkToken($Link);  
+    if (!$checkTokenResult) { 
         setHTTPSStatus("401", "Unauthorized");
         return;
     }

@@ -8,8 +8,13 @@ include_once "patientFunctions/SearchForPatientWithoutChildInspections.php";
 
 function route($method, $urlList, $requestData) {
     global $Link;
-
+    // Проверка токена, чтобы не проверять его в каждой функци.
+    if (!checkToken($Link)) {
+        // Если токен недействителен, завершить выполнение
+        return;
+    }
     $patientId = isset($urlList[2]) && is_numeric($urlList[2]) ? $urlList[2] : null;
+    
 
     switch ($method) {
         case 'GET':
@@ -24,8 +29,12 @@ function route($method, $urlList, $requestData) {
         case 'POST':
             if ($patientId !== null && isset($urlList[3]) && $urlList[3] === 'inspections') {
                 CreateInspectionForSpecifiedPatient($Link, $patientId, $requestData);
-            } else {
+            } 
+            elseif ($patientId === null && count($urlList) == 2 && $urlList[1] === 'patient') {
                 createNewPatient($requestData);
+            }
+            else {
+                setHTTPSStatus("400", "Incorrect path");
             }
             break;
 
