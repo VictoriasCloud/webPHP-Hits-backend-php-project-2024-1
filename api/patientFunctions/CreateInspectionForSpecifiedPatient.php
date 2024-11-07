@@ -30,7 +30,10 @@ function CreateInspectionForSpecifiedPatient($Link, $patientId, $requestData) {
     $previousInspectionId = $requestData->previousInspectionId ?? null;
     $diagnoses = $requestData->diagnoses ?? [];
 
-
+    if (!validateConclusion($conclusion)){
+        setHTTPSStatus("400", "Type conclusion not fuond");
+        return;
+    }
     // Валидация на наличие диагноза и дат для каждого типа заключения
     if (!validateConclusionLogic($conclusion, $nextVisitDate, $deathDate, $patientId)) {
         return;
@@ -46,8 +49,9 @@ function CreateInspectionForSpecifiedPatient($Link, $patientId, $requestData) {
         $deathDate = null; 
     }
 
-    // Проверка наличия основного диагноза (одного и только одного типа "Main") для всех типов диагнозов
-    if (!empty($diagnoses) && !checkMainDiagnosisCount($requestData)) {
+    // Проверка наличия основного диагноза (одного и только одного типа "Main") для всех типов
+    // диагнозов и проверка всех типов диагнозов
+    if (!empty($diagnoses) && !checkMainDiagnosisAndValidType($requestData)) {
         return;
     }
 

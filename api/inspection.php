@@ -27,7 +27,7 @@
 
                } elseif (count($urlList) == 3) {
                    // GET /api/inspection/{id}
-                   getFullInfo($inspectionId);
+                   getFullInfo();
                } else {
                    setHTTPSStatus("404", "Incorrect path for inspection");
                }

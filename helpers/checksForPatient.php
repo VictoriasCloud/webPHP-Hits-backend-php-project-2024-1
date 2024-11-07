@@ -25,13 +25,21 @@ function checkCreateTimeAndPresentTime($data){
 }
 
 
-// Проверка наличия хотя бы одного диагноза с типом "Main"
-function checkMainDiagnosisCount($requestData) {
+// Проверка наличия одного диагноза с типом "Main" и валидация типов
+function checkMainDiagnosisAndValidType($requestData) {
     $mainDiagnosisCount = 0;
 
     if (isset($requestData->diagnoses) && is_array($requestData->diagnoses)) {
         foreach ($requestData->diagnoses as $diagnosis) {
             $type = $diagnosis->type;
+            
+            // недопдопустимость типа диагноза
+            if (!checkDiagnosisType($type)) {
+                setHTTPSStatus("400", "Invalid diagnosis type: $type. Allowed types are: " . implode(', ', VALID_DIAGNOSIS_TYPES));
+                return false;
+            }
+
+            // Проверка на наличие одного Main диагноза
             if ($type === "Main") {
                 $mainDiagnosisCount++;
             }
@@ -42,5 +50,14 @@ function checkMainDiagnosisCount($requestData) {
         setHTTPSStatus("400", "Invalid diagnoses. Inspection must have exactly one Main diagnosis.");
         return false;
     }
+
     return true;
+}
+
+
+const VALID_DIAGNOSIS_TYPES = ['Main', 'Concomitant', 'Complication'];
+
+// Функция для проверки, является ли тип диагноза допустимым
+function checkDiagnosisType($type) {
+    return in_array($type, VALID_DIAGNOSIS_TYPES);
 }
