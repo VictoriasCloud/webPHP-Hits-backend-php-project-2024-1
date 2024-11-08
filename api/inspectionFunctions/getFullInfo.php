@@ -42,7 +42,7 @@ function getFullInspectionInfo($inspectionId) {
     setHTTPSStatus("200");
 }
 
-// Функция для получения данных осмотра
+// получение данных осмотра
 function fetchInspectionData($inspectionId) {
     global $Link;
     $query = "SELECT * FROM inspection WHERE id='$inspectionId'";
@@ -54,7 +54,7 @@ function fetchInspectionData($inspectionId) {
     return $result->fetch_assoc();
 }
 
-// Функция для получения данных пациента или врача
+// получение данные пациента или врача
 function fetchPersonData($table, $personId) {
     global $Link;
     $query = "SELECT * FROM $table WHERE id='$personId'";
@@ -66,7 +66,7 @@ function fetchPersonData($table, $personId) {
     return $result->fetch_assoc();
 }
 
-// Функция для получения диагнозов
+// Получение диагнозов
 function fetchDiagnoses($inspectionId) {
     global $Link;
     $query = "SELECT * FROM diagnosis WHERE idInspection='$inspectionId'";
@@ -90,7 +90,7 @@ function fetchDiagnoses($inspectionId) {
     return $diagnoses;
 }
 
-// Функция для получения консультаций и rootComment для этой консультации
+//Получение консультаций и rootComment для этой консультации
 function fetchConsultations($inspectionId) {
     global $Link;
     $consultationsQuery = "SELECT * FROM consultation WHERE inspectionId='$inspectionId'";
@@ -123,7 +123,7 @@ function fetchConsultations($inspectionId) {
     return $consultations;
 }
 
-// Функция для получения информации о специальности доктора
+// Получение информации о специальности доктора
 function fetchSpeciality($specialityId) {
     global $Link;
     $query = "SELECT * FROM speciality WHERE id='$specialityId'";
