@@ -1,76 +1,104 @@
 <?php
 
-function addComment($requestData) {
+function addCommentToConsultation($consultationId, $requestData) {
     global $Link;
-    $id = $_GET['id']; 
 
-    $token=explode(' ', getallheaders()['Authorization'])[1];
-    $checkTokenQuery = "SELECT * FROM token WHERE value='$token'";
-    $idDoctor = $Link->query($checkTokenQuery)->fetch_assoc()['doctorId'];
-    
-    $queryResult = $Link->query("SELECT name FROM doctor WHERE id='$idDoctor'");
-    $row = $queryResult->fetch_assoc();
-    $commentAuthorName = $row['name'];
-    // Проверка токена и наличия консультации
-    if (checkToken($Link)&&checkConsultation($id)){
+    // Получаем ID врача из токена
+    $doctorId = getDoctorIdFromToken();
+    if (!$doctorId) {
+        return;
+    }
 
-        $parentId = $requestData->body->parentId;
-        $content=$requestData->body->content;
-        $createTime = date("Y-m-d\TH:i:s.v\Z");
-            // Проверка наличия родительского комментария
-        if (!empty($parentId)&&(checkParentComment($parentId)==false)) {
+    // Проверка существования консультации
+    $consultationData = getConsultationData($consultationId);
+    if (!$consultationData) {
+        return;
+    }
+
+    // Проверка существования родительского комментария
+    $parentCommentId = $requestData->body->parentId ?? null;
+    if ($parentCommentId !== null) {
+        if (!parentCommentExists($parentCommentId)) {
+            setHTTPSStatus("404", "Parent comment not found or does not exist");
             return;
         }
-        // Определение parentId
-        elseif(empty($parentId)){
-            $parentId=definitionParentID($parentId, $id);
+    }
+
+    // Проверка прав пользователя на добавление комментария
+    if (!canAddComment($doctorId, $consultationData, $parentCommentId)) {
+        setHTTPSStatus("403", "User doesn't have add comment to consultation (unsuitable specialty and not the inspection author)");
+        return;
+    }
+
+    $content = $requestData->body->content ?? null;
+    if (empty($content) || strlen($content) <= 1) {
+        setHTTPSStatus("400", "Comment content must be more than one character");
+        return;
+    }
+    $createTime = date('Y-m-d\TH:i:s.u');
+
+    //добавление
+    $insertCommentQuery = "INSERT INTO comments (createTime, content, authorId, idParentComment, idConsultation) 
+                           VALUES ('$createTime', '$content', '$doctorId', '$parentCommentId', '$consultationId')";
+
+    if ($Link->query($insertCommentQuery) !== TRUE) {
+        setHTTPSStatus("500", "InternalServerError: " . $Link->error);
+        return;
+    }
+
+    $newCommentId = $Link->insert_id;
+    echo json_encode($newCommentId);
+    setHTTPSStatus("200");
+}
+
+// получение id врача из токена
+function getDoctorIdFromToken() {
+    global $Link;
+    $token = explode(' ', getallheaders()['Authorization'])[1];
+    $doctorQuery = "SELECT doctorId FROM token WHERE value='$token'";
+    $doctorResult = $Link->query($doctorQuery);
+    return $doctorResult ? $doctorResult->fetch_assoc()['doctorId'] : null;
+}
+
+
+// Проверка существования родительского комментария
+function parentCommentExists($parentCommentId) {
+    global $Link;
+    $parentCommentQuery = "SELECT id FROM comments WHERE id='$parentCommentId'";
+    $parentCommentResult = $Link->query($parentCommentQuery);
+
+    //возвращаем true, если комментарий найден
+    return $parentCommentResult && $parentCommentResult->num_rows > 0;
+}
+
+// Проверка прав на добавление комментария
+function canAddComment($doctorId, $consultationData, $parentCommentId) {
+    global $Link;
+
+    // Проверка, является ли пользователь автором консультации
+    if ($consultationData['idDoctor'] == $doctorId) {
+        return true;
+    }
+
+    // Проверка специальности пользователя
+    $specialityQuery = "SELECT speciality FROM doctor WHERE id='$doctorId' 
+                        AND speciality='{$consultationData['specialityId']}'";
+    $specialityResult = $Link->query($specialityQuery);
+    if ($specialityResult && $specialityResult->num_rows > 0) {
+        return true;
+    }
+
+    // Проверка, является ли пользователь автором родительского комментария, если он указан
+    if ($parentCommentId) {
+        $parentAuthorQuery = "SELECT authorId FROM comments WHERE id='$parentCommentId'";
+        $parentAuthorResult = $Link->query($parentAuthorQuery);
+        if ($parentAuthorResult) {
+            $parentAuthorId = $parentAuthorResult->fetch_assoc()['authorId'];
+            if ($parentAuthorId == $doctorId) {
+                return true;
+            }
         }
-        
-    // Вставка комментария в базу данных
-    $insertCommentQuery = "INSERT INTO comments (createTime, content, authorId, idParentComment, idConsultation, nameAuthor) 
-                           VALUES ('$createTime', '$content', '$idDoctor', '$parentId', '$id', '$commentAuthorName')";
+    }
 
-    if ($Link->query($insertCommentQuery) === TRUE) {
-        // Возвращаем успех
-        setHTTPSStatus("200", "Comment successfully added");
-    } else {
-        setHTTPSStatus("500", "InternalServerError");
-    }
-    return;
-    }
-}
-
-function checkConsultation($id){
-    global $Link;
-    $consultationCheck = $Link->query("SELECT * FROM consultation WHERE id = '$id'");
-    if (!$consultationCheck || $consultationCheck->num_rows === 0) {
-        setHTTPSStatus("404", "Consultation not found");
-        return 0;
-    }
-    return true;
-}
-
-// Проверка наличия родительского комментария
-function checkParentComment($parentId){
-    global $Link;
-    $parentCommentCheck = $Link->query("SELECT * FROM comments WHERE id = '$parentId'");
-    if (!$parentCommentCheck || $parentCommentCheck->num_rows === 0) {
-        setHTTPSStatus("404", "Consultation or parent comment not found");
-        return false;
-    }
-    return true;
-}
-
-// Если parentId не указан, берем самый последний комментарий у консультации
-function definitionParentID($parentId, $id){
-    global $Link;
-    $lastCommentQuery = "SELECT id FROM comments WHERE idConsultation = '$id' ORDER BY createTime DESC LIMIT 1";
-    $lastCommentResult = $Link->query($lastCommentQuery);
-    if ($lastCommentResult && $lastCommentResult->num_rows > 0) {
-        $lastComment = $lastCommentResult->fetch_assoc();
-        $parentId = $lastComment['id'];
-        return $parentId;
-    }
-    setHTTPSStatus("500", "InternalServerError");
-    return 0;
+    return false;
 }

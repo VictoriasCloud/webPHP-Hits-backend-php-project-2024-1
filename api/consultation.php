@@ -10,7 +10,6 @@ function route($method, $urlList, $requestData) {
     // Проверка токена на уровне роутинга
     $checkTokenResult = checkToken($Link);
     if (!$checkTokenResult) {
-        setHTTPSStatus("401", "Unauthorized");
         return;
     }
 
@@ -27,14 +26,16 @@ function route($method, $urlList, $requestData) {
             }
             break;
 
-        case 'POST':
-            if (count($urlList) === 4 && $urlList[2] === 'comment' && is_numeric($urlList[1])) {
-                // POST /api/consultation/{id}/comment - добавление комментария к конкретной консультации
-                addComment($urlList[1], $requestData);
-            } else {
-                setHTTPSStatus("404", "There is no such path as 'consultation/$urlList[1]'");
-            }
-            break;
+            case 'POST':
+                if (count($urlList) === 4 && $urlList[1] === 'consultation' && is_numeric($urlList[2]) && $urlList[3] === 'comment') {
+                    // POST /api/consultation/{id}/comment
+                    addCommentToConsultation($urlList[2], $requestData);  // передаем ID консультации и данные запроса
+                } else {
+                    setHTTPSStatus("404", "There is no such path as 'consultation/$urlList[1]'");
+                }
+                break;
+            
+            
 
         case 'PUT':
             if (count($urlList) === 4 && $urlList[1] === 'comment' && is_numeric($urlList[3])) {
