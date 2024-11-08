@@ -6,18 +6,29 @@ function logout($token) {
 
     // Проверяем, передан ли токен
     if (!isset($token)) {
-        setHTTPSStatus("401", "Token is missing");
+        setHTTPSStatus("401", "Unauthorized");
         return;
     }
 
-    // Удаляем токен из базы данных
-    $deleteTokenQuery = "DELETE FROM token WHERE value='$token'";
-    $deleteTokenResult = $Link->query($deleteTokenQuery);
+    // Получаем ID врача по токену
+    $doctorQuery = "SELECT doctorId FROM token WHERE value='$token'";
+    $doctorResult = $Link->query($doctorQuery);
 
-    // Проверяем успешность выполнения запроса
-    if ($deleteTokenResult) {
-        setHTTPSStatus("200", "Logged out successfully");
+    // Проверяем, существует ли такой токен
+    if ($doctorResult && $doctorResult->num_rows > 0) {
+        $doctorId = $doctorResult->fetch_assoc()['doctorId'];
+
+        // Удаляем все токены для данного врача
+        $deleteAllTokensQuery = "DELETE FROM token WHERE doctorId='$doctorId'";
+        $deleteAllTokensResult = $Link->query($deleteAllTokensQuery);
+
+        // Проверяем успешность выполнения запроса
+        if ($deleteAllTokensResult) {
+            setHTTPSStatus("200", "Logged out successfully");
+        } else {
+            setHTTPSStatus("500", "InternalServerError " . $Link->error);
+        }
     } else {
-        setHTTPSStatus("500", "Failed to logout: " . $Link->error);
+        setHTTPSStatus("404", "Token not found or invalid");
     }
 }

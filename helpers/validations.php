@@ -1,15 +1,13 @@
-
 <?php
-
 // Функция валидации данных доктора
-function validateDoctorData($password, $name, $email, $gender, $phone) {
+function validateDoctorData($password, $name, $email, $gender, $phone, $birthday) {
     $validationErrors = [];
 
-    if (!validateStringNotLess($password)) {
+    if (!validatePassword($password)) {
         $validationErrors[] = ["password", "Password less than 6 characters long"];
     }
 
-    if (!correctEmail($email)) {
+    if (!validateEmail($email)) {
         $validationErrors[] = ["email", "Invalid email address"];
     }
 
@@ -24,44 +22,58 @@ function validateDoctorData($password, $name, $email, $gender, $phone) {
     if (!validateGender($gender)) {
         $validationErrors[] = ["gender", "Invalid gender value"];
     }
+    
+    if (!validateBirthday($birthday)) {
+        $validationErrors[] = ["birthday", "Invalid birthday format or future date."];
+    }
 
     return $validationErrors;
 }
 
+function validateBirthday($birthday) {
+    // Попробуем создать объект DateTime из строки
+    $date = date_create($birthday);
 
-
-function validateConclusion($conclusion) {
-    $allowedValues = ['Disease', 'Recovery', 'Death'];
-    
-    if (in_array($conclusion, $allowedValues)) {
-        return true;
+    // Если дата корректна и не больше тек времени, - true, иначе - false
+    if ($date) {
+        $currentDate = new DateTime();
+        return $date < $currentDate;
     }
+
     return false;
 }
 
-// Функция для валидации дня рождения
-function validateBirthday($birthday) {
-    // Проверяем корректность формата даты и времени
-    $dateTime = DateTime::createFromFormat('Y-m-d\TH:i:s.u\Z', $birthday);
-    if (!$dateTime || $dateTime->format('Y-m-d\TH:i:s.u\Z') !== $birthday) {
-        return false;
-    }
-    // Проверяем, что год не превышает текущий год
-    $currentYear = date('Y');
-    if ($dateTime->format('Y') > $currentYear) {
-        return false;
-    }
-    return true;
+
+
+
+// Функция для преобразования даты в стандартный формат
+function updateTimeFormat($dateString) {
+    $date = new DateTime($dateString);
+    return $date->format('Y-m-d\TH:i:s.u\Z');
 }
 
+
+function validateEmail($email) {
+    return filter_var($email, FILTER_VALIDATE_EMAIL) !== false;
+}
+
+function validatePassword($password) {
+    return strlen($password) >= 6 && preg_match('/[A-Za-z]/', $password) && preg_match('/\d/', $password);
+}
 
 function validateName($name) {
-    // Проверка, что строка больше 1 символа,является строкой, содержит только буквы
-    if ((!is_string($name) || strlen($name) < 2)||(!preg_match('/^[a-zA-Zа-яА-ЯёЁ\s ]+$/', $name))) {
+    if (!is_string($name) || strlen($name) < 2) {
         return false;
     }
+
+    if (!preg_match('/^[a-zA-Zа-яА-ЯёЁ\s]+$/u', $name)) {
+        return false;
+    }
+
     return true;
 }
+
+
 
 function validateGender($str){
     if($str == "Male" || $str == "Female"){
@@ -70,28 +82,16 @@ function validateGender($str){
     return false;
 }
 
-// Функция валидации пароля на мин длину(6)
-function validateStringNotLess($string) {
-    return strlen($string) >= 6;
-}
-
-// Функция проверки правильности формата электронной почты
-function correctEmail($email) {
-    return filter_var($email, FILTER_VALIDATE_EMAIL);
-}
-
-// Функция проверки правильности формата номера телефона
 function correctPhoneNumber($phone) {
     /* не хочу в с постман вписывать каждый раз номер, поэтому 
-    пусть будет пока просто тру. регулярка внизу работает
+    пусть будет пока просто тру. регулярка внизу работает*/
     
-    if(preg_match('/\+7\s\(\d{3}\)\s\d{3}\-\d{2}\-\d{2}/',$str)){
+    if(preg_match('/\+7\(\d{3}\)\d{3}\-\d{2}\-\d{2}/',$phone)){
         return true;
     }
     else{
         return false;
-    }*/
-    return true;
+    }
 }
 
 // Генерация токена
@@ -107,6 +107,16 @@ function validatePaginationParameters($page, $size) {
     }
     return true;
 }
+
+function validateConclusion($conclusion) {
+    $allowedValues = ['Disease', 'Recovery', 'Death'];
+    
+    if (in_array($conclusion, $allowedValues)) {
+        return true;
+    }
+    return false;
+}
+
 
 function validateConclusionLogic($conclusion, $nextVisitDate, $deathDate, $patientId) {
     switch ($conclusion) {
