@@ -20,7 +20,7 @@ function editProfile($requestData) {
     $phone = $requestData->body->phone;
 
     // Валидация данных профиля
-    $validationErrors = validateDoctorData(null, $name, $email, $gender, $phone, $birthday);
+    $validationErrors = validateDoctorData("kostil24", $name, $email, $gender, $phone, $birthday);
     if (!empty($validationErrors)) {
         $validationMessage = [];
         foreach ($validationErrors as $err) {

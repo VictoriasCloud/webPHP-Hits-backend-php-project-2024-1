@@ -39,8 +39,8 @@ function registerDoctor($requestData) {
     $createTime = date('Y-m-d\TH:i:s.u');
 
     // Вставка данных о докторе в базу
-    $insertDoctorQuery = "INSERT INTO doctor(name, password, email, birthday, gender, phone, speciality) 
-                          VALUES('$name', '$hashedPassword', '$email', '$birthday', '$gender', '$phone', '$speciality')";
+    $insertDoctorQuery = "INSERT INTO doctor(name, password, email, birthday, gender, phone, speciality, createTime) 
+                          VALUES('$name', '$hashedPassword', '$email', '$birthday', '$gender', '$phone', '$speciality', '$createTime')";
     $userInsertResult = $Link->query($insertDoctorQuery);
 
     if (!$userInsertResult) {
