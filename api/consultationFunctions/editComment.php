@@ -1,55 +1,62 @@
 <?php
 
-function editComment($requestData) {
+function editComment($commentId, $requestData) {
     global $Link;
 
-    $id = $_GET['id']; 
-    $content=$requestData->body->content;
-    //проверка токена, существования комментария и авторства комментария
-
-    if(checkToken($Link)&&(checkIdComment($id)&&checkAuthor($id))){
-        // Обновление комментария
-        $currentTime = date("Y-m-d\TH:i:s.v\Z");
-
-        $updateCommentQuery = "UPDATE comments SET content = '$content', modifiedDate = '$currentTime' WHERE id = '$id'";
-
-        if ($Link->query($updateCommentQuery) === TRUE) {
-            // Возвращаем успех
-            setHTTPSStatus("200", "Comment successfully edited");
-        } else {
-            setHTTPSStatus("500", "InternalServerError");
-            }
-        }
-    return false;
-
-}
-
-function checkAuthor($idComment){
-    global $Link;
-    $token=explode(' ', getallheaders()['Authorization'])[1];
-    $checkTokenQuery = "SELECT * FROM token WHERE value='$token'";
-    $idDoctor = $Link->query($checkTokenQuery)->fetch_assoc()['doctorId'];
-    //idDoctora
-    $authorId="SELECT * FROM comments WHERE id='$idComment'";
-    $authorId=$Link->query($authorId)->fetch_assoc()['authorId'];
-    if ($idDoctor!=$authorId){
-        setHTTPSStatus("403", "User is not the author of the comment");
-        return false;
+    $doctorId = getDoctorIdFromToken();
+    if (!$doctorId) {
+        setHTTPSStatus("401", "Unauthorized");
+        return;
     }
-    return true;
-}
 
-function checkIdComment($idComment){
-    global $Link;
-
-    $id="SELECT id FROM comments WHERE id='$idComment'";
-    $idResult=$Link->query($id);
-
-    if ($idResult->num_rows==1){
-        return true;
+    if (!isCommentExists($commentId)) {
+        setHTTPSStatus("404", "Comment not found");
+        return;
     }
-    setHTTPSStatus("404", "Comment not found|Invalid arguments");
-    return false;
+
+    if (!isUserCommentAuthor($commentId, $doctorId)) {
+        setHTTPSStatus("403", "You do not have permission to edit this comment");
+        return;
+    }
+
+    $newContent = getValidContent($requestData);
+    if (!$newContent) {
+        setHTTPSStatus("400", "Invalid content. Comment content must be at least 2 characters long.");
+        return;
+    }
+
+    if (!updateCommentInDatabase($commentId, $newContent)) {
+        setHTTPSStatus("500", "Error updating comment");
+        return;
+    }
+
+    setHTTPSStatus("200");
 }
 
+function isCommentExists($commentId) {
+    global $Link;
+    $commentQuery = "SELECT id FROM comments WHERE id='$commentId'";
+    $commentResult = $Link->query($commentQuery);
+    return $commentResult && $commentResult->num_rows > 0;
+}
 
+// является ли пользователь автором комментария
+function isUserCommentAuthor($commentId, $doctorId) {
+    global $Link;
+    $authorQuery = "SELECT authorId FROM comments WHERE id='$commentId'";
+    $authorResult = $Link->query($authorQuery);
+    return $authorResult && $authorResult->fetch_assoc()['authorId'] == $doctorId;
+}
+
+function getValidContent($requestData) {
+    $content = $requestData->body->content ?? null;
+    return ($content && strlen(trim($content)) >= 2) ? $content : null;
+}
+
+// Обновление комм-я
+function updateCommentInDatabase($commentId, $newContent) {
+    global $Link;
+    $modifiedDate = date('Y-m-d\TH:i:s.u');
+    $updateQuery = "UPDATE comments SET content='$newContent', modifiedDate='$modifiedDate' WHERE id='$commentId'";
+    return $Link->query($updateQuery) === TRUE;
+}

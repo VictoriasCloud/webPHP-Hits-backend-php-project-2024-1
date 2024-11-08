@@ -4,6 +4,7 @@ include_once 'helpers/checks.php';
 include_once 'helpers/validations.php';
 include_once 'helpers/checksForPatient.php';
 include_once 'helpers/helperForDoctor.php';
+include_once 'helpers/helperForInspection.php';
 
 global $Link, $UploadDir;
 

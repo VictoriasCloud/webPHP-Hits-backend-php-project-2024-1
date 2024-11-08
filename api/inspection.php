@@ -8,7 +8,6 @@
    
        $checkTokenResult = checkToken($Link);
        if (!$checkTokenResult) {
-           setHTTPSStatus("401", "Unauthorized");
            return;
        }
    

@@ -1,54 +1,53 @@
 <?php
-    include_once "consultationFunctions/getConsultationById.php";
-    include_once "consultationFunctions/getAlistOfMedicalInspectionsForConsultation.php";
-    include_once "consultationFunctions/addComment.php";
-    include_once "consultationFunctions/editComment.php";
+include_once "consultationFunctions/getConsultationById.php";
+include_once "consultationFunctions/getAlistOfMedicalInspectionsForConsultation.php";
+include_once "consultationFunctions/addComment.php";
+include_once "consultationFunctions/editComment.php";
 
-    function route($method, $urlList, $requestData){
+function route($method, $urlList, $requestData) {
+    global $Link;
 
-        switch ($method) {
-            case 'GET':
-                switch ($urlList[2]) {
-                    case 'getConsultationById':
-                        getConsultationById();
-                        break;
-                    case 'getAlistOfMedicalInspectionsForConsultation':
-                        getAlistOfMedicalInspectionsForConsultation();
-                        break;
-                    default:
-                    //или 400 ошибка(неверный запрос к урлу)
-                        setHTTPSStatus("404", "There is no such path as 'consultation/$urlList[1]'");
-                        break;    
-                }
-                break;
+    // Проверка токена на уровне роутинга
+    $checkTokenResult = checkToken($Link);
+    if (!$checkTokenResult) {
+        return;
+    }
+
+    switch ($method) {
+        case 'GET':
+            if (count($urlList) === 2  && $urlList[1] === 'consultation') {
+                // GET /api/consultation - список осмотров для консультаций
+                getAlistOfMedicalInspectionsForConsultation();
+            } elseif (count($urlList) === 3 && is_numeric($urlList[2])) {
+                // GET /api/consultation/{id} - получение конкретной консультации
+                getConsultationById($urlList[2]);
+            } else {
+                setHTTPSStatus("404", "There is no such path as 'consultation/$urlList[1]'");
+            }
+            break;
 
             case 'POST':
-                switch ($urlList[2]) {
-                    case 'addComment':  
-                        addComment($requestData);
-                        break;
-                    default:
-                    //или 400 ошибка(неверный запрос к урлу)
-                        setHTTPSStatus("404", "There is no such path as 'consultation/$urlList[1]'");
-                        break;             
-                }                  
+                if (count($urlList) === 4 && $urlList[1] === 'consultation' && is_numeric($urlList[2]) && $urlList[3] === 'comment') {
+                    // POST /api/consultation/{id}/comment
+                    addCommentToConsultation($urlList[2], $requestData);  // передаем ID консультации и данные запроса
+                } else {
+                    setHTTPSStatus("404", "There is no such path as 'consultation/$urlList[1]'");
+                }
                 break;
-            case 'PUT':
-                switch ($urlList[2]) {
-                    case 'editComment':  
-                        editComment($requestData);
-                        break;
-                    default:
-                    //или 400 ошибка(неверный запрос к урлу)
-                        setHTTPSStatus("404", "There is no such path as 'consultation/$urlList[1]'");
-                        break;             
-                }                  
-                break;
-                        
             
-            default:
-                //или 400 ошибка(неверный запрос к урлу/синтаксическая ошибка)
-                setHTTPSStatus("404", "There is no such method here or Method Not Allowed(405)");
-                break;
-        }
+            
+
+        case 'PUT':
+            if (count($urlList) === 4 && $urlList[2] === 'comment' && is_numeric($urlList[3])) {
+                // PUT /api/consultation/comment/{id} - редактирование комментария
+                editComment($urlList[3], $requestData);
+            } else {
+                setHTTPSStatus("404", "There is no such path as 'consultation/$urlList[2]'");
+            }
+            break;
+
+        default:
+            setHTTPSStatus("405", "Method Not Allowed");
+            break;
     }
+}
