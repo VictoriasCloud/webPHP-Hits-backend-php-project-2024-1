@@ -1,83 +1,74 @@
 <?php
-function getInspectionChain($inspectionId){
-
+function getInspectionChain($inspectionId) {
     global $Link;
 
-
-    // Проверка авторизации пользователя
-    $checkTokenResult = checkToken($Link);
-    if (!$checkTokenResult) {
-        setHTTPSStatus("401", "Unauthorized");
-        return;
-    }
-
-    // Проверка наличия осмотра с указанным идентификатором
+    //  наличие осмотра с указанным идентификатором
     $checkInspectionQuery = "SELECT * FROM inspection WHERE id='$inspectionId'";
     $checkInspectionResult = $Link->query($checkInspectionQuery);
 
     if ($checkInspectionResult->num_rows == 0) {
-        // Если осмотр не найден, возвращаем статус 404 (Not Found)
-        setHTTPSStatus("404", "Not Found");
+        setHTTPSStatus("404", "Inspection not Found");
         return;
     }
 
-    // Получаем медицинскую цепочку для корневого осмотра
     $inspectionChain = [];
     $currentInspectionId = $inspectionId;
 
-    // Используем while для обхода осмотров в цепочке
+    // Используем цикл для обхода цепочки осмотров
     while (true) {
-        // Запрос для получения информации о текущем осмотре с диагнозом типа "Main"
-        $getCurrentInspectionQuery = "SELECT i.id, i.createTime, i.date, i.conclusion, i.IdDoctor, d.name AS doctor, i.idPatient, p.name AS patient, 
-                                        d.id AS diagnosis_id, d.createTime AS diagnosis_createTime, d.code, d.name AS diagnosis_name, d.description, d.type
-                                        FROM inspection i
-                                        INNER JOIN diagnosis d ON i.id = d.idInspection
-                                        INNER JOIN patient p ON i.idPatient = p.id
-                                        WHERE i.id = '$currentInspectionId' AND d.type = 'Main'";
-        $currentInspectionResult = $Link->query($getCurrentInspectionQuery);
+        // Запрос для получения дочернего осмотра
+        $getNextInspectionQuery = "
+        SELECT i.id, i.createTime, i.date, i.conclusion, i.idDoctor, i.idPatient, 
+               p.name AS patient, 
+               d.id AS diagnosis_id, d.createTime AS diagnosis_createTime, d.code, d.name AS diagnosis_name, 
+               d.description, d.type, 
+               doc.name AS doctor_name, 
+               CASE WHEN i.hasChain = 1 THEN 'true' ELSE 'false' END AS hasChain,
+               CASE WHEN EXISTS (SELECT 1 FROM inspection nested WHERE nested.previousInspectionId = i.id) 
+                    THEN 'true' ELSE 'false' END AS hasNested,
+               i.previousInspectionId
+        FROM inspection i
+        INNER JOIN diagnosis d ON i.id = d.idInspection AND d.type = 'Main'
+        INNER JOIN patient p ON i.idPatient = p.id
+        INNER JOIN doctor doc ON i.idDoctor = doc.id
+        WHERE i.previousInspectionId = '$currentInspectionId'";
+    
+    
 
-        if ($currentInspectionResult->num_rows > 0) {
-            $currentInspectionData = $currentInspectionResult->fetch_assoc();
+        $nextInspectionResult = $Link->query($getNextInspectionQuery);
+
+        // Если дочерний осмотр найден, добавляем его в массив
+        if ($nextInspectionResult->num_rows == 1) {
+            $nextInspectionData = $nextInspectionResult->fetch_assoc();
 
             // Добавляем информацию о диагнозе к текущему осмотру
-            $currentInspectionData['diagnosis'] = [
-                'id' => $currentInspectionData['diagnosis_id'],
-                'createTime' => $currentInspectionData['diagnosis_createTime'],
-                'code' => $currentInspectionData['code'],
-                'name' => $currentInspectionData['diagnosis_name'],
-                'description' => $currentInspectionData['description'],
-                'type' => $currentInspectionData['type']
+            $nextInspectionData['diagnosis'] = [
+                'id' => $nextInspectionData['diagnosis_id'],
+                'createTime' => $nextInspectionData['diagnosis_createTime'],
+                'code' => $nextInspectionData['code'],
+                'name' => $nextInspectionData['diagnosis_name'],
+                'description' => $nextInspectionData['description'],
+                'type' => $nextInspectionData['type']
             ];
 
             // Удаляем лишние поля
-            unset($currentInspectionData['diagnosis_id']);
-            unset($currentInspectionData['diagnosis_createTime']);
-            unset($currentInspectionData['code']);
-            unset($currentInspectionData['diagnosis_name']);
-            unset($currentInspectionData['description']);
-            unset($currentInspectionData['type']);
+            unset($nextInspectionData['diagnosis_id']);
+            unset($nextInspectionData['diagnosis_createTime']);
+            unset($nextInspectionData['code']);
+            unset($nextInspectionData['diagnosis_name']);
+            unset($nextInspectionData['description']);
+            unset($nextInspectionData['type']);
 
-            // Добавляем текущий осмотр в цепочку
-            $inspectionChain[] = $currentInspectionData;
+            $inspectionChain[] = $nextInspectionData;
 
-            // Проверяем, есть ли следующий осмотр в цепочке
-            $getNextInspectionQuery = "SELECT id FROM inspection WHERE previousInspectionId = '$currentInspectionId'";
-            $nextInspectionResult = $Link->query($getNextInspectionQuery);
-
-            if ($nextInspectionResult->num_rows == 1) {
-                $nextInspectionId = $nextInspectionResult->fetch_assoc()['id'];
-                $currentInspectionId = $nextInspectionId; // Переходим к следующему осмотру в цепочке
-            } else {
-                break; // Завершаем цикл, если следующий осмотр не найден
-            }
+            // Обновляем `currentInspectionId` для поиска следующего осмотра
+            $currentInspectionId = $nextInspectionData['id'];
         } else {
-            // Если информация о текущем осмотре с диагнозом "Main" не найдена, возвращаем ошибку 500 (InternalServerError)
-            setHTTPSStatus("500", "InternalServerError");
-            return;
+            break;
         }
     }
 
-    // Возвращаем медицинскую цепочку в виде JSON
     echo json_encode($inspectionChain);
-    setHTTPSStatus("200", "Success");
+    setHTTPSStatus("200");
 }
+

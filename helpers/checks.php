@@ -36,3 +36,14 @@ function checkToken($Link){
         return false;
     }
 }
+
+
+// Проверка прав на редактирование
+function hasEditPermission($doctorId) {
+    global $Link;
+    $token = explode(' ', getallheaders()['Authorization'])[1];
+    $query = "SELECT doctorId FROM token WHERE value='$token'";
+    $currentDoctorId = $Link->query($query)->fetch_assoc()['doctorId'];
+    return $doctorId == $currentDoctorId;
+}
+
