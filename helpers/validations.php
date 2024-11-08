@@ -1,17 +1,44 @@
 
 <?php
 
+// Функция валидации данных доктора
+function validateDoctorData($password, $name, $email, $gender, $phone) {
+    $validationErrors = [];
+
+    if (!validateStringNotLess($password)) {
+        $validationErrors[] = ["password", "Password less than 6 characters long"];
+    }
+
+    if (!correctEmail($email)) {
+        $validationErrors[] = ["email", "Invalid email address"];
+    }
+
+    if (!correctPhoneNumber($phone)) {
+        $validationErrors[] = ["phone", "Invalid phone number"];
+    }
+
+    if (!validateName($name)) {
+        $validationErrors[] = ["name", "Invalid name"];
+    }
+
+    if (!validateGender($gender)) {
+        $validationErrors[] = ["gender", "Invalid gender value"];
+    }
+
+    return $validationErrors;
+}
+
+
+
 function validateConclusion($conclusion) {
-    // Перечень допустимых значений
     $allowedValues = ['Disease', 'Recovery', 'Death'];
     
-    // Проверяем, присутствует ли значение в списке допустимых значений
     if (in_array($conclusion, $allowedValues)) {
         return true;
     }
-    // Значение не входит в список допустимых
     return false;
 }
+
 // Функция для валидации дня рождения
 function validateBirthday($birthday) {
     // Проверяем корректность формата даты и времени
@@ -78,5 +105,54 @@ function validatePaginationParameters($page, $size) {
         setHTTPSStatus("400", "Invalid arguments for pagination");
         return false;
     }
+    return true;
+}
+
+function validateConclusionLogic($conclusion, $nextVisitDate, $deathDate, $patientId) {
+    switch ($conclusion) {
+        case "Disease":
+            if (is_null($nextVisitDate)) {
+                setHTTPSStatus("400", "Specify the date of the next visit.");
+                return false;
+            }
+            break;
+        case "Death":
+            if (!checkConclusionWithDeath($patientId)) {
+                return false;
+            }
+            if (is_null($deathDate)) {
+                setHTTPSStatus("400", "Specify the date of death.");
+                return false;
+            }
+            break;
+        case "Recovery":
+            break;
+        default:
+            setHTTPSStatus("400", "Invalid conclusion type");
+            return false;
+    }
+    return true;
+}
+
+// Допустимые значения для conclusion. это для файла editIn(файл что выше не подойдёт)
+const VALID_CONCLUSIONS = ['Disease', 'Death', 'Recovery'];
+function validateConclusionFields($conclusion, $nextVisitDate, $deathDate) {
+    
+    // Проверка, что conclusion имеет допустимое значение
+    if (!in_array($conclusion, VALID_CONCLUSIONS)) {
+        setHTTPSStatus("400", "Invalid conclusion value: $conclusion. Allowed values are: " . implode(', ', VALID_CONCLUSIONS));
+        return false;
+    }
+
+    if ($conclusion === "Disease" && is_null($nextVisitDate)) {
+        setHTTPSStatus("400", "Specify the date of the next visit for 'Disease' conclusion");
+        return false;
+    }
+    
+    if ($conclusion === "Death" && is_null($deathDate)) {
+        setHTTPSStatus("400", "Specify the date of death for 'Death' conclusion");
+        return false;
+    }
+
     return true;
 }
