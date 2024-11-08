@@ -3,47 +3,58 @@ include_once "helpers/headers.php";
 
 function login($requestData) {
     global $Link;
- 
+
+    // Проверка наличия email и пароля
+    if (empty($requestData->body->email) || empty($requestData->body->password)) {
+        setHTTPSStatus("400", "Invalid arguments: email and password are required.");
+        return;
+    }
+
     $email = $requestData->body->email;
-    $password = hash("sha1", $requestData->body->password);
+    $password = $requestData->body->password;
 
-    $result = $Link->query("SELECT * FROM doctor WHERE email='$email' AND password='$password'");
+    if (!validateEmail($email)) {
+        setHTTPSStatus("400", "Invalid email format.");
+        return;
+    }
 
-    $tokenCheckQuery = "SELECT * FROM token WHERE doctorId IN (SELECT id FROM doctor WHERE email='$email')";
-    $tokenCheckResult = $Link->query($tokenCheckQuery);
-    //num_rows-это метод объекта mysqli_result, который возвращает количество строк т.е 1 польз-ель с указанным email и паролем
+    if (!validatePassword($password)) {
+        setHTTPSStatus("400", "Password must be at least 6 characters long and include both letters and numbers.");
+        return;
+    }
+
+    // Хешируем пароль после валидации
+    $hashedPassword = hash("sha1", $password);
+
+    // Проверка существования врача с такими учетными данными
+    $result = $Link->query("SELECT * FROM doctor WHERE email='$email' AND password='$hashedPassword'");
+    if (!$result) {
+        setHTTPSStatus("500", "InternalServerError: " . $Link->error);
+        return;
+    }
+
     if ($result->num_rows == 1) {
+        $doctorId = $result->fetch_assoc()['id'];
 
-        if ($tokenCheckResult->num_rows == 1) {
-            // Если токен существует Генерируем новый токен
-            $token = generateToken();
-
-            // Обновляем токен в базе данных
-            $timeToValid = date('Y-m-d\TH:i:s.u');
-            $doctorId = $result->fetch_assoc()['id'];
-            $tokenUpdateResult = $Link->query("UPDATE token SET value='$token', createTime='$timeToValid' WHERE doctorId='$doctorId'");
-
-            if (!$tokenUpdateResult) {
-                setHTTPSStatus("500", $Link->error);
-            } else {
-                echo json_encode(['token' => $token]);
-            }
-        } else {
-            // Если токен не существует тоже генерируем новый токен
-            $token = generateToken();
-
-            // Добавляем токен в бд
-            $timeToValid = date('Y-m-d\TH:i:s.u');
-            $doctorId = $result->fetch_assoc()['id'];
-            $tokenInsertResult = $Link->query("INSERT INTO token(value, doctorId, createTime) VALUES('$token', '$doctorId', '$timeToValid')");
-
-            if (!$tokenInsertResult) {
-                setHTTPSStatus("500", $Link->error);
-            } else {
-                echo json_encode(['token' => $token]);
-            }
+        // Удаление всех существующих токенов для данного врача
+        if (!deleteExistingTokens($doctorId)) {
+            setHTTPSStatus("500", "InternalServerError: Failed to delete old tokens.");
+            return;
         }
+
+        // Генерация и вставка нового токена
+        $token = generateToken();
+        $createTime = date('Y-m-d\TH:i:s.u');
+
+        if (!insertToken($token, $doctorId, $createTime)) {
+            setHTTPSStatus("500", "InternalServerError: Failed to insert new token.");
+            return;
+        }
+
+        echo json_encode(['token' => $token]);
+        setHTTPSStatus("200", "Doctor was registered");
     } else {
-        setHTTPSStatus("401", "Unauthorized");
+        setHTTPSStatus("400", "Invalid arguments");
+        return;
     }
 }

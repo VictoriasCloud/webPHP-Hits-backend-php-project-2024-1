@@ -123,18 +123,6 @@ function fetchConsultations($inspectionId) {
     return $consultations;
 }
 
-// Получение информации о специальности доктора
-function fetchSpeciality($specialityId) {
-    global $Link;
-    $query = "SELECT * FROM speciality WHERE id='$specialityId'";
-    $result = $Link->query($query);
-    if (!$result) {
-        setHTTPSStatus("500", "InternalServerError: " . $Link->error);
-        return false;
-    }
-    return $result->fetch_assoc();
-}
-
 // rootComment для консультации
 function fetchRootComment($consultationId) {
     global $Link;

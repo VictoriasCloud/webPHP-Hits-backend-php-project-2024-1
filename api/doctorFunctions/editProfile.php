@@ -19,6 +19,20 @@ function editProfile($requestData) {
     $gender = $requestData->body->gender;
     $phone = $requestData->body->phone;
 
+    // Валидация данных профиля
+    $validationErrors = validateDoctorData("kostil24", $name, $email, $gender, $phone, $birthday);
+    if (!empty($validationErrors)) {
+        $validationMessage = [];
+        foreach ($validationErrors as $err) {
+            $validationMessage[] = "$err[0]: $err[1]";
+        }
+        $formattedMessage = implode("; ", $validationMessage); // Преобразуем массив в строку
+        setHTTPSStatus("400", $formattedMessage);
+        return;
+        // setHTTPSStatus("400", "Invalid params");
+        // return;
+    }
+
 
     // Проверяем, существует ли токен в базе данных
     $checkTokenQuery = "SELECT * FROM token WHERE value='$token'";

@@ -2,9 +2,8 @@
 function registerDoctor($requestData) {
     global $Link;
 
-    // Извлечение данных из запроса("sha1": Это алгоритм хэширования, который
-    // используется для преобразования входной строки в хэш для обеспечения безопасности пароля.)
-    $password = hash("sha1", $requestData->body->password);
+    // Извлечение данных из запроса
+    $password = $requestData->body->password;
     $name = $requestData->body->name;
     $email = $requestData->body->email;
     $birthday = $requestData->body->birthday;
@@ -12,42 +11,56 @@ function registerDoctor($requestData) {
     $phone = $requestData->body->phone;
     $speciality = $requestData->body->speciality;
 
-    // Проверка валидности данных
-    $validationErrors = validateDoctorData($password, $name, $email, $gender, $phone);
+    // Хешируем пароль для безопасности
+    $hashedPassword = hash("sha1", $password);
 
-    // Если есть ошибки валидации, возвращаем соответствующий статус и сообщение
-    if (!empty($validationErrors)) {
-        $validationMessage = "";
-        foreach ($validationErrors as $err) {
-            $validationMessage .= "$err[0]: $err[1]";
-        }
-        setHTTPSStatus("400", $validationMessage);
+    if (!fetchSpeciality($speciality)) {
         return;
     }
 
-    // Генерация ID и токена
-    //не надо,поставила автоинкрементом $id = generate_uuid();
-    $token = generateToken();
 
-    // Вставка данных в бд
-    $userInsertResult = $Link->query("INSERT INTO doctor(name, password, email, birthday, gender, phone, speciality) VALUES('$name', '$password', '$email', '$birthday',  '$gender', '$phone', '$speciality')");
+    // Валидация данных
+    $validationErrors = validateDoctorData($password, $name, $email, $gender, $phone, $birthday);
+    if (!empty($validationErrors)) {
+        $validationMessage = [];
+        foreach ($validationErrors as $err) {
+            $validationMessage[] = "$err[0]: $err[1]";
+        }
+        $formattedMessage = implode("; ", $validationMessage); // Преобразуем массив в строку
+        setHTTPSStatus("400", $formattedMessage);
+        return;
+        // setHTTPSStatus("400", "Invalid params");
+        // return;
+
+    }
+
+    // Генерация токена
+    $token = generateToken();
+    $createTime = date('Y-m-d\TH:i:s.u');
+
+    // Вставка данных о докторе в базу
+    $insertDoctorQuery = "INSERT INTO doctor(name, password, email, birthday, gender, phone, speciality, createTime) 
+                          VALUES('$name', '$hashedPassword', '$email', '$birthday', '$gender', '$phone', '$speciality', '$createTime')";
+    $userInsertResult = $Link->query($insertDoctorQuery);
+
     if (!$userInsertResult) {
         if ($Link->errno == 1062) {
-            setHTTPSStatus("409", "Адрес электронной почты '$email' уже занят");
-            return;
-        }
-    } else {
-        // Вставка токена в бд
-        $timeToValid = date('Y-m-d\TH:i:s.u');
-        $doctorInfo=$Link->query("SELECT email, id FROM doctor WHERE email='$email'")->fetch_assoc();
-        $doctorId=$doctorInfo['id'];
-        $tokenInsertResult = $Link->query("INSERT INTO token(value, doctorId, createTime) VALUES('$token', '$doctorId', '$timeToValid')");
-
-        if (!$tokenInsertResult) {
-            setHTTPSStatus("500", $Link->error);
+            setHTTPSStatus("409", "Email '$email' is already in use.");
         } else {
-            echo json_encode(['token' => $token]);
+            setHTTPSStatus("500", "InternalServerError: " . $Link->error);
         }
+        return;
+    }
+
+    // Получаем ID вставленного врача
+    $doctorId = $Link->insert_id;
+
+    // Вставка токена в базу
+    $tokenInsertResult = $Link->query("INSERT INTO token(value, doctorId, createTime) VALUES('$token', '$doctorId', '$createTime')");
+    if (!$tokenInsertResult) {
+        setHTTPSStatus("500", "InternalServerError: " . $Link->error);
+    } else {
+        echo json_encode(['token' => $token]);
+        setHTTPSStatus("200");
     }
 }
-
