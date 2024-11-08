@@ -16,7 +16,7 @@ function getSpecialitiesList() {
             $result = $Link->query($searchQuery);
 
             if ($result) {
-                // Подготовка данных для ответа
+
                 $specialties = [];
                 while ($row = $result->fetch_assoc()) {
                     $specialties[] = $row;
@@ -36,19 +36,19 @@ function getSpecialitiesList() {
                     setHTTPSStatus("400", "No specialties found|Invalid arguments for filtration");
                     return;
                 }
-                // Формирование ответа в формате JSON
+
                 $answer = [
                     "specialties" => $specialties,
                     "pagination" => [
                         "size" => $size,
-                        "countOfPages" => $countOfPages,
+                        "count" => $countOfPages,
                         "current" => $page
                     ]
                 ];
                 echo json_encode($answer);
 
                 // Отправка сообщения о успешном получении списка специальностей
-                setHTTPSStatus("200", "Specialities paged list retrieved");
+                setHTTPSStatus("200");
                 }
             }
         else{

@@ -14,7 +14,6 @@ function searchICD10Diagnoses() {
             $startOfString = ($page - 1) * $size;
             $searchQuery = "SELECT * FROM icd10 WHERE mkb_name LIKE '%$request%' OR mkb_code LIKE '%$request%' LIMIT $startOfString, $size";
         
-            // Выполнение запроса
             $result = $Link->query($searchQuery);
 
             if (!$result) {
@@ -41,9 +40,8 @@ function searchICD10Diagnoses() {
                 "current" => $page
             ];
         
-            // Формирование ответа в формате JSON
             echo json_encode(['records' => $records, 'pagination' => $pagination]);
-            setHTTPSStatus("200", "Searching result extracted");
+            setHTTPSStatus("200");
         }
         else{
             setHTTPSStatus("400", "Some fields in request are invalid");

@@ -1,34 +1,23 @@
 <?php
-    include_once "createSpeciality/speciality.php";
-    function route($method, $urlList, $requestData){
-        switch ($method) {
-            case 'POST':
-                switch ($urlList[2]) {
-                    case 'createSpeciality':  
-                        echo "ураа3";
-                        createSpeciality($requestData);
-                        break;
+include_once "createSpeciality/speciality.php";
 
-                    /*case 'login':  
-                        login($requestData);
-                        break;
+function route($method, $urlList, $requestData) {
+    switch ($method) {
+        case 'POST':
+            if (isset($urlList[2]) && $urlList[2] === 'speciality') {
+                //api/speciality
+                if (count($urlList) === 3) {
+                    createSpeciality($requestData);
+                } else {
+                    setHTTPSStatus("400", "Invalid path");
+                }
+            } else {
+                setHTTPSStatus("404", "Invalid path: no such endpoint '$urlList[2]' in 'api'.");
+            }
+            break;
 
-                    case 'logout':  
-                        logout($requestData);
-                        break;
-
-                    default:
-                        setHTTPSStatus("404", "There is no such path as 'account/$urlList[1]'");
-                        break;  */                  
-                }                  
-                break;
-
-            case 'PUT':
-                //editProfile($requestData);
-                break;
-            
-            default:
-                setHTTPSStatus("404", "There is no such method here");
-                break;
-        }
+        default:
+            setHTTPSStatus("405", "Method not allowed for this route");
+            break;
     }
+}
