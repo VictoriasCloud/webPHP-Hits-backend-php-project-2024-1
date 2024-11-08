@@ -46,4 +46,3 @@ function hasEditPermission($doctorId) {
     $currentDoctorId = $Link->query($query)->fetch_assoc()['doctorId'];
     return $doctorId == $currentDoctorId;
 }
-

@@ -51,14 +51,6 @@ function addCommentToConsultation($consultationId, $requestData) {
     setHTTPSStatus("200");
 }
 
-// получение id врача из токена
-function getDoctorIdFromToken() {
-    global $Link;
-    $token = explode(' ', getallheaders()['Authorization'])[1];
-    $doctorQuery = "SELECT doctorId FROM token WHERE value='$token'";
-    $doctorResult = $Link->query($doctorQuery);
-    return $doctorResult ? $doctorResult->fetch_assoc()['doctorId'] : null;
-}
 
 
 // Проверка существования родительского комментария

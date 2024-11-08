@@ -15,7 +15,7 @@ function route($method, $urlList, $requestData) {
 
     switch ($method) {
         case 'GET':
-            if (count($urlList) === 2) {
+            if (count($urlList) === 2  && $urlList[1] === 'consultation') {
                 // GET /api/consultation - список осмотров для консультаций
                 getAlistOfMedicalInspectionsForConsultation();
             } elseif (count($urlList) === 3 && is_numeric($urlList[2])) {
@@ -38,11 +38,11 @@ function route($method, $urlList, $requestData) {
             
 
         case 'PUT':
-            if (count($urlList) === 4 && $urlList[1] === 'comment' && is_numeric($urlList[3])) {
+            if (count($urlList) === 4 && $urlList[2] === 'comment' && is_numeric($urlList[3])) {
                 // PUT /api/consultation/comment/{id} - редактирование комментария
                 editComment($urlList[3], $requestData);
             } else {
-                setHTTPSStatus("404", "There is no such path as 'consultation/$urlList[1]'");
+                setHTTPSStatus("404", "There is no such path as 'consultation/$urlList[2]'");
             }
             break;
 
